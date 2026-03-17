@@ -1,0 +1,3 @@
+-- Initial schema placeholder.
+-- The first implementation uses in-memory repositories.
+-- Database-backed stores will be added in the next iteration.
