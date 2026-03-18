@@ -1,10 +1,26 @@
+Shell 脚本任务示例：
+
+```json
+{
+    "name": "cleanup-tmp",
+    "description": "clean up temp files every hour",
+    "enabled": true,
+    "interval_seconds": 3600,
+    "executor_type": "shell",
+    "shell_script": "find /tmp -name '*.tmp' -mtime +1 -delete\necho 'cleanup done'",
+    "shell_shell": "/bin/sh",
+    "shell_timeout_seconds": 30
+}
+```
+
+@@带依赖的任务示例
 # Cron Job
 
 一个用 Go 编写的定时任务配置管理系统骨架，当前实现采用“模块化单体 + 控制循环内核”的路线，支持：
 
 - 任务配置管理
 - `interval` 和 `cron` 两种调度方式
-- SDK 任务与二进制任务两类执行模型
+- SDK 任务、二进制任务、Shell 脚本三类执行模型
 - HTTP transport 的 SDK 执行
 - gRPC transport 的 SDK 执行
 - 任务依赖 DAG 基础能力
@@ -19,11 +35,11 @@
 
 当前版本已经实现一个可运行的 MVP：
 
-- `Job` 和 `JobRun` 分离建模
+- `Job` 和 `JobRun` 分离建模（executor_type: sdk / binary / shell）
 - `ScheduleLoop` 根据调度规则生成 `JobRun`
 - `DependencyLoop` 处理被依赖阻塞的任务
 - `RunLoop` 从 ready queue 取任务并调用执行器
-- SQLite 版 `Repository`、内存版 `Queue`/`Lease`
+- MySQL 版 `Repository`、内存版 `Queue`/`Lease`
 - 文件版任务日志存储
 - 日志流过滤和关键字检索
 - JSON API
@@ -91,17 +107,17 @@ graph TD
     end
 
     subgraph REPO["存储层 internal/repository/"]
-        SQLITE[("SQLite\njobs\njob_runs\ndependency_edges")]
+        MYSQL[("MySQL\njobs\njob_runs\ndependency_edges")]
         FILELOG[("File Logs\n{runID}-stdout.log\n{runID}-stderr.log")]
     end
 
     SERVER --> HTTPAPI & ADMINUI & SCHLOOP & DEPLOOP & RUNLOOP
     HTTPAPI --> JOBSVC
     ADMINUI --> JOBSVC
-    JOBSVC --> SQLITE & FILELOG & QUEUE & CANCEL
-    SCHLOOP --> SQLITE & QUEUE
-    DEPLOOP --> SQLITE & QUEUE
-    RUNLOOP --> QUEUE & LEASE & CANCEL & SQLITE & FILELOG
+    JOBSVC --> MYSQL & FILELOG & QUEUE & CANCEL
+    SCHLOOP --> MYSQL & QUEUE
+    DEPLOOP --> MYSQL & QUEUE
+    RUNLOOP --> QUEUE & LEASE & CANCEL & MYSQL & FILELOG
     RUNLOOP --> BINARY & SDKHTTP & SDKGRPC
     SDKGRPC -->|"gRPC / JSON Codec"| SDKWORKER
     SDKHTTP -->|"HTTP POST v1"| SDKWORKER
@@ -141,9 +157,9 @@ flowchart LR
 | 应用 | `internal/app/job` | 用例编排（不含存储细节） |
 | 调度 | `internal/scheduler/` | cron/interval 触发、DAG 依赖释放 |
 | 分发 | `internal/dispatcher/` | Ready Queue、Run Loop、租约、取消 |
-| 执行 | `internal/executor/` | Binary、SDK-HTTP、SDK-gRPC 三种执行适配 |
+| 执行 | `internal/executor/` | Binary、Shell、SDK-HTTP、SDK-gRPC 四种执行适配 |
 | 领域 | `internal/domain/` | Job、JobRun、Dependency 模型与状态机 |
-| 存储 | `internal/repository/` | SQLite（job/run/edge）、文件日志 |
+| 存储 | `internal/repository/` | MySQL（job/run/edge）、文件日志 |
 
 ## 启动方式
 
@@ -181,10 +197,10 @@ HTTP_ADDR=:9090 go run ./cmd/server
 LOG_DIR=./tmp/logs go run ./cmd/server
 ```
 
-SQLite 数据库路径也可覆盖：
+MySQL DSN 可通过环境变量覆盖：
 
 ```bash
-DB_PATH=./data/cron-job.db go run ./cmd/server
+DB_DSN='root:root@tcp(127.0.0.1:3306)/cron_job?charset=utf8mb4&parseTime=true&loc=Local' go run ./cmd/server
 ```
 
 后台登录账号也可通过环境变量覆盖：

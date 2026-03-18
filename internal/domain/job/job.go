@@ -7,6 +7,7 @@ type ExecutorKind string
 const (
 	ExecutorKindSDK    ExecutorKind = "sdk"
 	ExecutorKindBinary ExecutorKind = "binary"
+	ExecutorKindShell  ExecutorKind = "shell"
 )
 
 type ConcurrencyPolicy string
@@ -51,6 +52,7 @@ type ExecutorSpec struct {
 	Kind   ExecutorKind
 	SDK    *SDKTarget
 	Binary *BinaryTarget
+	Shell  *ShellTarget
 }
 
 type SDKTarget struct {
@@ -66,6 +68,14 @@ type BinaryTarget struct {
 	Timeout time.Duration
 }
 
+type ShellTarget struct {
+	// Script is an inline shell script (passed to Shell via -c).
+	Script string
+	// Shell is the interpreter to use; defaults to /bin/sh.
+	Shell   string
+	Timeout time.Duration
+}
+
 func (j Job) Validate() error {
 	if j.Name == "" {
 		return ErrInvalidJob("name is required")
@@ -78,6 +88,9 @@ func (j Job) Validate() error {
 	}
 	if j.Executor.Kind == ExecutorKindBinary && j.Executor.Binary == nil {
 		return ErrInvalidJob("binary target is required")
+	}
+	if j.Executor.Kind == ExecutorKindShell && (j.Executor.Shell == nil || j.Executor.Shell.Script == "") {
+		return ErrInvalidJob("shell script is required")
 	}
 	return nil
 }

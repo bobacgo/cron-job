@@ -229,6 +229,8 @@ func executorName(job jobdomain.Job) (string, bool) {
 		}
 	case jobdomain.ExecutorKindBinary:
 		return "binary", true
+	case jobdomain.ExecutorKindShell:
+		return "shell", true
 	}
 	return "", false
 }

@@ -5,7 +5,7 @@ import "os"
 type Config struct {
 	HTTPAddr string
 	LogDir   string
-	DBPath   string
+	DBDSN    string
 }
 
 func Load() Config {
@@ -17,10 +17,14 @@ func Load() Config {
 	if logDir == "" {
 		logDir = "data/logs"
 	}
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "data/cron-job.db"
+	dbDSN := os.Getenv("DB_DSN")
+	if dbDSN == "" {
+		// Backward compatibility: allow DB_PATH as alias of DSN.
+		dbDSN = os.Getenv("DB_PATH")
+	}
+	if dbDSN == "" {
+		dbDSN = "root:root@tcp(127.0.0.1:3306)/cron_job?charset=utf8mb4&parseTime=true&loc=Local"
 	}
 
-	return Config{HTTPAddr: addr, LogDir: logDir, DBPath: dbPath}
+	return Config{HTTPAddr: addr, LogDir: logDir, DBDSN: dbDSN}
 }

@@ -170,6 +170,9 @@ type createJobRequest struct {
 	BinaryArgs            []string `json:"binary_args"`
 	BinaryTimeoutSeconds  int      `json:"binary_timeout_seconds"`
 	DependencyIDs         []string `json:"dependency_ids"`
+	ShellScript           string   `json:"shell_script"`
+	ShellShell            string   `json:"shell_shell"`
+	ShellTimeoutSeconds   int      `json:"shell_timeout_seconds"`
 }
 
 func (r createJobRequest) toExecutorSpec() jobdomain.ExecutorSpec {
@@ -180,6 +183,20 @@ func (r createJobRequest) toExecutorSpec() jobdomain.ExecutorSpec {
 				Command: r.BinaryCommand,
 				Args:    r.BinaryArgs,
 				Timeout: time.Duration(r.BinaryTimeoutSeconds) * time.Second,
+			},
+		}
+	}
+	if r.ExecutorType == string(jobdomain.ExecutorKindShell) {
+		sh := r.ShellShell
+		if sh == "" {
+			sh = "/bin/sh"
+		}
+		return jobdomain.ExecutorSpec{
+			Kind: jobdomain.ExecutorKindShell,
+			Shell: &jobdomain.ShellTarget{
+				Script:  r.ShellScript,
+				Shell:   sh,
+				Timeout: time.Duration(r.ShellTimeoutSeconds) * time.Second,
 			},
 		}
 	}

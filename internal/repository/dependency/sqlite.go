@@ -7,15 +7,15 @@ import (
 	dependencydomain "github.com/bobacgo/cron-job/internal/domain/dependency"
 )
 
-type SQLiteRepository struct {
+type MySQLRepository struct {
 	db *sql.DB
 }
 
-func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
-	return &SQLiteRepository{db: db}
+func NewMySQLRepository(db *sql.DB) *MySQLRepository {
+	return &MySQLRepository{db: db}
 }
 
-func (r *SQLiteRepository) Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error {
+func (r *MySQLRepository) Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (r *SQLiteRepository) Replace(ctx context.Context, jobID string, edges []de
 	return tx.Commit()
 }
 
-func (r *SQLiteRepository) ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error) {
+func (r *MySQLRepository) ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies WHERE job_id = ? ORDER BY depends_on_job_id ASC`, jobID)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (r *SQLiteRepository) ListByJob(ctx context.Context, jobID string) ([]depen
 	return items, nil
 }
 
-func (r *SQLiteRepository) ListAll(ctx context.Context) ([]dependencydomain.Edge, error) {
+func (r *MySQLRepository) ListAll(ctx context.Context) ([]dependencydomain.Edge, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies ORDER BY job_id ASC, depends_on_job_id ASC`)
 	if err != nil {
 		return nil, err

@@ -9,16 +9,16 @@ import (
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 )
 
-type SQLiteRepository struct {
+type MySQLRepository struct {
 	db *sql.DB
 }
 
-func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
-	return &SQLiteRepository{db: db}
+func NewMySQLRepository(db *sql.DB) *MySQLRepository {
+	return &MySQLRepository{db: db}
 }
 
-func (r *SQLiteRepository) Save(ctx context.Context, job jobdomain.Job) error {
-	binaryArgs, err := json.Marshal(binaryArgs(job))
+func (r *MySQLRepository) Save(ctx context.Context, job jobdomain.Job) error {
+	binaryArgsJSON, err := json.Marshal(binaryArgs(job))
 	if err != nil {
 		return err
 	}
@@ -28,34 +28,38 @@ INSERT INTO jobs (
 	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
 	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
 	binary_command, binary_args_json, binary_timeout_seconds,
+	shell_script, shell_shell, shell_timeout_seconds,
 	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
 	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET
-	name=excluded.name,
-	description=excluded.description,
-	enabled=excluded.enabled,
-	schedule_cron=excluded.schedule_cron,
-	schedule_interval_seconds=excluded.schedule_interval_seconds,
-	schedule_time_zone=excluded.schedule_time_zone,
-	schedule_starting_deadline_seconds=excluded.schedule_starting_deadline_seconds,
-	executor_kind=excluded.executor_kind,
-	sdk_protocol=excluded.sdk_protocol,
-	sdk_url=excluded.sdk_url,
-	sdk_method=excluded.sdk_method,
-	sdk_timeout_seconds=excluded.sdk_timeout_seconds,
-	binary_command=excluded.binary_command,
-	binary_args_json=excluded.binary_args_json,
-	binary_timeout_seconds=excluded.binary_timeout_seconds,
-	retry_max_retries=excluded.retry_max_retries,
-	retry_initial_backoff_seconds=excluded.retry_initial_backoff_seconds,
-	retry_max_backoff_seconds=excluded.retry_max_backoff_seconds,
-	retry_backoff_multiple=excluded.retry_backoff_multiple,
-	concurrency_policy=excluded.concurrency_policy,
-	next_run_at=excluded.next_run_at,
-	last_run_at=excluded.last_run_at,
-	last_success_at=excluded.last_success_at,
-	updated_at=excluded.updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE
+	name=VALUES(name),
+	description=VALUES(description),
+	enabled=VALUES(enabled),
+	schedule_cron=VALUES(schedule_cron),
+	schedule_interval_seconds=VALUES(schedule_interval_seconds),
+	schedule_time_zone=VALUES(schedule_time_zone),
+	schedule_starting_deadline_seconds=VALUES(schedule_starting_deadline_seconds),
+	executor_kind=VALUES(executor_kind),
+	sdk_protocol=VALUES(sdk_protocol),
+	sdk_url=VALUES(sdk_url),
+	sdk_method=VALUES(sdk_method),
+	sdk_timeout_seconds=VALUES(sdk_timeout_seconds),
+	binary_command=VALUES(binary_command),
+	binary_args_json=VALUES(binary_args_json),
+	binary_timeout_seconds=VALUES(binary_timeout_seconds),
+	shell_script=VALUES(shell_script),
+	shell_shell=VALUES(shell_shell),
+	shell_timeout_seconds=VALUES(shell_timeout_seconds),
+	retry_max_retries=VALUES(retry_max_retries),
+	retry_initial_backoff_seconds=VALUES(retry_initial_backoff_seconds),
+	retry_max_backoff_seconds=VALUES(retry_max_backoff_seconds),
+	retry_backoff_multiple=VALUES(retry_backoff_multiple),
+	concurrency_policy=VALUES(concurrency_policy),
+	next_run_at=VALUES(next_run_at),
+	last_run_at=VALUES(last_run_at),
+	last_success_at=VALUES(last_success_at),
+	updated_at=VALUES(updated_at)
 `,
 		job.ID,
 		job.Name,
@@ -71,8 +75,11 @@ ON CONFLICT(id) DO UPDATE SET
 		sdkMethod(job),
 		int64(sdkTimeout(job).Seconds()),
 		binaryCommand(job),
-		string(binaryArgs),
+		string(binaryArgsJSON),
 		int64(binaryTimeout(job).Seconds()),
+		shellScript(job),
+		shellShell(job),
+		int64(shellTimeout(job).Seconds()),
 		job.RetryPolicy.MaxRetries,
 		int64(job.RetryPolicy.InitialBackoff.Seconds()),
 		int64(job.RetryPolicy.MaxBackoff.Seconds()),
@@ -87,17 +94,17 @@ ON CONFLICT(id) DO UPDATE SET
 	return err
 }
 
-func (r *SQLiteRepository) Get(ctx context.Context, id string) (jobdomain.Job, error) {
-	row := r.db.QueryRowContext(ctx, `
-SELECT
+const selectJobColumns = `
 	id, name, description, enabled,
 	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
 	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
 	binary_command, binary_args_json, binary_timeout_seconds,
+	shell_script, shell_shell, shell_timeout_seconds,
 	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
-	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at
-FROM jobs WHERE id = ?
-`, id)
+	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at`
+
+func (r *MySQLRepository) Get(ctx context.Context, id string) (jobdomain.Job, error) {
+	row := r.db.QueryRowContext(ctx, `SELECT`+selectJobColumns+` FROM jobs WHERE id = ?`, id)
 	job, err := scanJob(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -108,52 +115,25 @@ FROM jobs WHERE id = ?
 	return job, nil
 }
 
-func (r *SQLiteRepository) List(ctx context.Context) ([]jobdomain.Job, error) {
-	rows, err := r.db.QueryContext(ctx, `
-SELECT
-	id, name, description, enabled,
-	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
-	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
-	binary_command, binary_args_json, binary_timeout_seconds,
-	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
-	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at
-FROM jobs ORDER BY created_at ASC
-`)
+func (r *MySQLRepository) List(ctx context.Context) ([]jobdomain.Job, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT`+selectJobColumns+` FROM jobs ORDER BY created_at ASC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	items := make([]jobdomain.Job, 0)
-	for rows.Next() {
-		item, err := scanJob(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return collectJobs(rows)
 }
 
-func (r *SQLiteRepository) ListEnabled(ctx context.Context) ([]jobdomain.Job, error) {
-	rows, err := r.db.QueryContext(ctx, `
-SELECT
-	id, name, description, enabled,
-	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
-	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
-	binary_command, binary_args_json, binary_timeout_seconds,
-	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
-	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at
-FROM jobs WHERE enabled = 1 ORDER BY created_at ASC
-`)
+func (r *MySQLRepository) ListEnabled(ctx context.Context) ([]jobdomain.Job, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT`+selectJobColumns+` FROM jobs WHERE enabled = 1 ORDER BY created_at ASC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return collectJobs(rows)
+}
 
+func collectJobs(rows *sql.Rows) ([]jobdomain.Job, error) {
 	items := make([]jobdomain.Job, 0)
 	for rows.Next() {
 		item, err := scanJob(rows.Scan)
@@ -162,10 +142,7 @@ FROM jobs WHERE enabled = 1 ORDER BY created_at ASC
 		}
 		items = append(items, item)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, rows.Err()
 }
 
 type scanner func(dest ...any) error
@@ -188,6 +165,9 @@ func scanJob(scan scanner) (jobdomain.Job, error) {
 		binaryCommand                   string
 		binaryArgsJSON                  string
 		binaryTimeoutSeconds            int64
+		shellScript                     string
+		shellShell                      string
+		shellTimeoutSeconds             int64
 		retryMaxRetries                 int
 		retryInitialBackoffSeconds      int64
 		retryMaxBackoffSeconds          int64
@@ -200,35 +180,17 @@ func scanJob(scan scanner) (jobdomain.Job, error) {
 		updatedAt                       string
 	)
 	if err := scan(
-		&id,
-		&name,
-		&description,
-		&enabled,
-		&scheduleCron,
-		&scheduleIntervalSeconds,
-		&scheduleTimeZone,
-		&scheduleStartingDeadlineSeconds,
-		&executorKind,
-		&sdkProtocol,
-		&sdkURL,
-		&sdkMethod,
-		&sdkTimeoutSeconds,
-		&binaryCommand,
-		&binaryArgsJSON,
-		&binaryTimeoutSeconds,
-		&retryMaxRetries,
-		&retryInitialBackoffSeconds,
-		&retryMaxBackoffSeconds,
-		&retryBackoffMultiple,
-		&concurrencyPolicy,
-		&nextRunAt,
-		&lastRunAt,
-		&lastSuccessAt,
-		&createdAt,
-		&updatedAt,
+		&id, &name, &description, &enabled,
+		&scheduleCron, &scheduleIntervalSeconds, &scheduleTimeZone, &scheduleStartingDeadlineSeconds,
+		&executorKind, &sdkProtocol, &sdkURL, &sdkMethod, &sdkTimeoutSeconds,
+		&binaryCommand, &binaryArgsJSON, &binaryTimeoutSeconds,
+		&shellScript, &shellShell, &shellTimeoutSeconds,
+		&retryMaxRetries, &retryInitialBackoffSeconds, &retryMaxBackoffSeconds, &retryBackoffMultiple,
+		&concurrencyPolicy, &nextRunAt, &lastRunAt, &lastSuccessAt, &createdAt, &updatedAt,
 	); err != nil {
 		return jobdomain.Job{}, err
 	}
+
 	var args []string
 	if err := json.Unmarshal([]byte(binaryArgsJSON), &args); err != nil {
 		args = nil
@@ -272,6 +234,13 @@ func scanJob(scan scanner) (jobdomain.Job, error) {
 			Command: binaryCommand,
 			Args:    args,
 			Timeout: time.Duration(binaryTimeoutSeconds) * time.Second,
+		}
+	}
+	if job.Executor.Kind == jobdomain.ExecutorKindShell {
+		job.Executor.Shell = &jobdomain.ShellTarget{
+			Script:  shellScript,
+			Shell:   shellShell,
+			Timeout: time.Duration(shellTimeoutSeconds) * time.Second,
 		}
 	}
 	return job, nil
@@ -349,4 +318,25 @@ func binaryTimeout(job jobdomain.Job) time.Duration {
 		return 0
 	}
 	return job.Executor.Binary.Timeout
+}
+
+func shellScript(job jobdomain.Job) string {
+	if job.Executor.Shell == nil {
+		return ""
+	}
+	return job.Executor.Shell.Script
+}
+
+func shellShell(job jobdomain.Job) string {
+	if job.Executor.Shell == nil {
+		return ""
+	}
+	return job.Executor.Shell.Shell
+}
+
+func shellTimeout(job jobdomain.Job) time.Duration {
+	if job.Executor.Shell == nil {
+		return 0
+	}
+	return job.Executor.Shell.Timeout
 }

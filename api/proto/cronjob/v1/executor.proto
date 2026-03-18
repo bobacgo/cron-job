@@ -4,29 +4,33 @@ package cronjob.v1;
 
 option go_package = "github.com/bobacgo/cron-job/internal/executor/sdk/protocol;protocol";
 
+// Executor defines the gRPC service for executing cron jobs.
 service Executor {
+  // Run executes a cron job based on the provided RunRequest and returns a RunResponse.
   rpc Run(RunRequest) returns (RunResponse);
 }
 
+// ErrorCode defines the possible error codes for the RunResponse.
 enum ErrorCode {
-  ERROR_CODE_UNSPECIFIED = 0;
-  ERROR_CODE_NONE = 1;
-  ERROR_CODE_INVALID_VERSION = 2;
-  ERROR_CODE_INVALID_REQUEST = 3;
-  ERROR_CODE_UNAUTHORIZED = 4;
-  ERROR_CODE_TIMEOUT = 5;
-  ERROR_CODE_INTERNAL = 6;
+  ERROR_CODE_UNSPECIFIED = 0; // 未说明的
+  ERROR_CODE_NONE = 1; // 无错误
+  ERROR_CODE_INVALID_VERSION = 2; // 协议版本不兼容
+  ERROR_CODE_INVALID_REQUEST = 3; // 请求参数无效
+  ERROR_CODE_UNAUTHORIZED = 4; // 未授权
+  ERROR_CODE_TIMEOUT = 5; // 执行超时
+  ERROR_CODE_INTERNAL = 6; // 内部错误
 }
 
+// RunRequest represents the request message for executing a cron job.
 message RunRequest {
   string protocol_version = 1;
   repeated string supported_versions = 2;
-  string job_id = 3;
-  string job_name = 4;
-  string run_id = 5;
-  string scheduled_at = 6;
-  int32 attempt = 7;
-  string trigger_type = 8;
+  string job_id = 3; // 作业唯一标识符
+  string job_name = 4; // 作业名称
+  string run_id = 5; // 本次执行的唯一标识符
+  string scheduled_at = 6; // 计划执行时间
+  int32 attempt = 7; // 尝试次数
+  string trigger_type = 8; // 触发类型
 }
 
 message RunResponse {

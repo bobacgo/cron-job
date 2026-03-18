@@ -19,11 +19,12 @@ import (
 	binaryexec "github.com/bobacgo/cron-job/internal/executor/binary"
 	sdkgrpc "github.com/bobacgo/cron-job/internal/executor/sdk/grpc"
 	sdkhttp "github.com/bobacgo/cron-job/internal/executor/sdk/http"
+	shellexec "github.com/bobacgo/cron-job/internal/executor/shell"
 	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
 	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
 	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
 	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
-	sqliterepo "github.com/bobacgo/cron-job/internal/repository/sqlite"
+	mysqlrepo "github.com/bobacgo/cron-job/internal/repository/sqlite"
 	schedulerloop "github.com/bobacgo/cron-job/internal/scheduler/loop"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 	adminhandler "github.com/bobacgo/cron-job/internal/transport/admin/handler"
@@ -34,15 +35,15 @@ import (
 func main() {
 	cfg := config.Load()
 
-	db, err := sqliterepo.Open(cfg.DBPath)
+	db, err := mysqlrepo.Open(cfg.DBDSN)
 	if err != nil {
-		log.Fatalf("init sqlite: %v", err)
+		log.Fatalf("init mysql: %v", err)
 	}
 	defer db.Close()
 
-	jobStore := jobrepo.NewSQLiteRepository(db)
-	jobRunStore := jobrunrepo.NewSQLiteRepository(db)
-	dependencyStore := dependencyrepo.NewSQLiteRepository(db)
+	jobStore := jobrepo.NewMySQLRepository(db)
+	jobRunStore := jobrunrepo.NewMySQLRepository(db)
+	dependencyStore := dependencyrepo.NewMySQLRepository(db)
 	runLogStore, err := logrepo.NewFileRepository(cfg.LogDir)
 	if err != nil {
 		log.Fatalf("init log repository: %v", err)
@@ -56,6 +57,7 @@ func main() {
 	executorRegistry.Register("sdk-http", sdkhttp.NewExecutor(http.DefaultClient))
 	executorRegistry.Register("sdk-grpc", sdkgrpc.NewExecutor())
 	executorRegistry.Register("binary", binaryexec.NewExecutor())
+	executorRegistry.Register("shell", shellexec.NewExecutor())
 
 	jobService := jobapp.NewService(jobStore, jobRunStore, dependencyStore, runLogStore, readyQueue, plannerSvc)
 	jobService.SetRunCanceler(runCancelManager)

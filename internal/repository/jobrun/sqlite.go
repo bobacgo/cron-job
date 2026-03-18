@@ -8,30 +8,30 @@ import (
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 )
 
-type SQLiteRepository struct {
+type MySQLRepository struct {
 	db *sql.DB
 }
 
-func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
-	return &SQLiteRepository{db: db}
+func NewMySQLRepository(db *sql.DB) *MySQLRepository {
+	return &MySQLRepository{db: db}
 }
 
-func (r *SQLiteRepository) Save(ctx context.Context, run jobrundomain.JobRun) error {
+func (r *MySQLRepository) Save(ctx context.Context, run jobrundomain.JobRun) error {
 	_, err := r.db.ExecContext(ctx, `
 INSERT INTO job_runs (
 	id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at, dedup_key
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET
-	job_id=excluded.job_id,
-	scheduled_at=excluded.scheduled_at,
-	started_at=excluded.started_at,
-	finished_at=excluded.finished_at,
-	status=excluded.status,
-	attempt=excluded.attempt,
-	trigger_type=excluded.trigger_type,
-	message=excluded.message,
-	updated_at=excluded.updated_at,
-	dedup_key=excluded.dedup_key
+ON DUPLICATE KEY UPDATE
+	job_id=VALUES(job_id),
+	scheduled_at=VALUES(scheduled_at),
+	started_at=VALUES(started_at),
+	finished_at=VALUES(finished_at),
+	status=VALUES(status),
+	attempt=VALUES(attempt),
+	trigger_type=VALUES(trigger_type),
+	message=VALUES(message),
+	updated_at=VALUES(updated_at),
+	dedup_key=VALUES(dedup_key)
 `,
 		run.ID,
 		run.JobID,
@@ -49,7 +49,7 @@ ON CONFLICT(id) DO UPDATE SET
 	return err
 }
 
-func (r *SQLiteRepository) Get(ctx context.Context, id string) (jobrundomain.JobRun, error) {
+func (r *MySQLRepository) Get(ctx context.Context, id string) (jobrundomain.JobRun, error) {
 	row := r.db.QueryRowContext(ctx, `
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE id = ?
@@ -64,28 +64,28 @@ FROM job_runs WHERE id = ?
 	return item, nil
 }
 
-func (r *SQLiteRepository) List(ctx context.Context) ([]jobrundomain.JobRun, error) {
+func (r *MySQLRepository) List(ctx context.Context) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs ORDER BY created_at DESC
 `)
 }
 
-func (r *SQLiteRepository) ListByJob(ctx context.Context, jobID string) ([]jobrundomain.JobRun, error) {
+func (r *MySQLRepository) ListByJob(ctx context.Context, jobID string) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE job_id = ? ORDER BY created_at DESC
 `, jobID)
 }
 
-func (r *SQLiteRepository) ListByStatus(ctx context.Context, status jobrundomain.Status) ([]jobrundomain.JobRun, error) {
+func (r *MySQLRepository) ListByStatus(ctx context.Context, status jobrundomain.Status) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE status = ? ORDER BY created_at DESC
 `, string(status))
 }
 
-func (r *SQLiteRepository) FindByDedupKey(ctx context.Context, key string) (jobrundomain.JobRun, bool, error) {
+func (r *MySQLRepository) FindByDedupKey(ctx context.Context, key string) (jobrundomain.JobRun, bool, error) {
 	row := r.db.QueryRowContext(ctx, `
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE dedup_key = ? LIMIT 1
@@ -100,7 +100,7 @@ FROM job_runs WHERE dedup_key = ? LIMIT 1
 	return item, true, nil
 }
 
-func (r *SQLiteRepository) listQuery(ctx context.Context, query string, args ...any) ([]jobrundomain.JobRun, error) {
+func (r *MySQLRepository) listQuery(ctx context.Context, query string, args ...any) ([]jobrundomain.JobRun, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
