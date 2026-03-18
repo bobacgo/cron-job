@@ -31,17 +31,19 @@ func (e *Executor) Execute(ctx context.Context, req executor.Request) (executor.
 	defer conn.Close()
 
 	request := sdkprotocol.RunRequest{
-		JobID:       req.Job.ID,
-		JobName:     req.Job.Name,
-		RunID:       req.Run.ID,
-		ScheduledAt: req.Run.ScheduledAt,
-		Attempt:     req.Run.Attempt,
-		TriggerType: req.Run.TriggerType,
+		ProtocolVersion:   sdkprotocol.CurrentVersion,
+		SupportedVersions: append([]string(nil), sdkprotocol.SupportedVersions...),
+		JobID:             req.Job.ID,
+		JobName:           req.Job.Name,
+		RunID:             req.Run.ID,
+		ScheduledAt:       req.Run.ScheduledAt,
+		Attempt:           req.Run.Attempt,
+		TriggerType:       req.Run.TriggerType,
 	}
 	response := sdkprotocol.RunResponse{}
 	method := req.Job.Executor.SDK.Method
 	if method == "" {
-		method = "/cronjob.v1.Executor/Run"
+		method = sdkprotocol.MethodExecutorRun
 	}
 	if err := conn.Invoke(ctx, method, &request, &response); err != nil {
 		return executor.Result{Status: jobrundomain.StatusFailed, StartedAt: startedAt, FinishedAt: time.Now().UTC(), Message: err.Error()}, nil
@@ -55,10 +57,22 @@ func (e *Executor) Execute(ctx context.Context, req executor.Request) (executor.
 		}
 		output = string(outputBytes)
 	}
-	status := sdkprotocol.NormalizeStatus(response.Status)
+	if response.ProtocolVersion != "" && !sdkprotocol.IsSupportedVersion(response.ProtocolVersion) {
+		return executor.Result{
+			Status:     jobrundomain.StatusFailed,
+			Message:    "unsupported worker protocol version: " + response.ProtocolVersion,
+			Output:     output,
+			StartedAt:  startedAt,
+			FinishedAt: time.Now().UTC(),
+		}, nil
+	}
+	status := sdkprotocol.StatusFromResponse(response)
 	message := strings.TrimSpace(response.Message)
 	if message == "" {
 		message = "sdk grpc request completed"
+	}
+	if response.ErrorCode != "" && response.ErrorCode != sdkprotocol.ErrorCodeNone {
+		message = string(response.ErrorCode) + ": " + message
 	}
 	return executor.Result{
 		Status:     status,

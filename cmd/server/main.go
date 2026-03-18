@@ -11,6 +11,7 @@ import (
 
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
 	"github.com/bobacgo/cron-job/internal/config"
+	dispatchercancel "github.com/bobacgo/cron-job/internal/dispatcher/cancel"
 	dispatcherlease "github.com/bobacgo/cron-job/internal/dispatcher/lease"
 	dispatcherloop "github.com/bobacgo/cron-job/internal/dispatcher/loop"
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
@@ -48,6 +49,7 @@ func main() {
 	}
 	readyQueue := queue.NewInMemoryQueue()
 	leaseManager := dispatcherlease.NewMemoryManager(30 * time.Second)
+	runCancelManager := dispatchercancel.NewManager()
 	plannerSvc := planner.New()
 
 	executorRegistry := executor.NewRegistry()
@@ -56,12 +58,13 @@ func main() {
 	executorRegistry.Register("binary", binaryexec.NewExecutor())
 
 	jobService := jobapp.NewService(jobStore, jobRunStore, dependencyStore, runLogStore, readyQueue, plannerSvc)
+	jobService.SetRunCanceler(runCancelManager)
 	apiHandler := httpapihandler.NewJobHandler(jobService)
 	adminPages := adminhandler.NewPageHandler(jobService, jobRunStore, runLogStore)
 
 	scheduleLoop := schedulerloop.New(jobStore, jobRunStore, dependencyStore, readyQueue, plannerSvc)
 	dependencyLoop := schedulerloop.NewDependency(dependencyStore, jobRunStore, readyQueue)
-	runLoop := dispatcherloop.New(jobStore, jobRunStore, runLogStore, readyQueue, leaseManager, executorRegistry)
+	runLoop := dispatcherloop.New(jobStore, jobRunStore, runLogStore, readyQueue, leaseManager, runCancelManager, executorRegistry)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

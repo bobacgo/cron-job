@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	dispatchercancel "github.com/bobacgo/cron-job/internal/dispatcher/cancel"
 	dispatcherlease "github.com/bobacgo/cron-job/internal/dispatcher/lease"
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
@@ -25,11 +26,15 @@ type Loop struct {
 	logs      logrepo.Repository
 	queue     queue.Queue
 	leases    dispatcherlease.Manager
+	cancels   *dispatchercancel.Manager
 	executors *executor.Registry
 }
 
-func New(jobs jobrepo.Repository, runs jobrunrepo.Repository, logs logrepo.Repository, queue queue.Queue, leases dispatcherlease.Manager, executors *executor.Registry) *Loop {
-	return &Loop{jobs: jobs, runs: runs, logs: logs, queue: queue, leases: leases, executors: executors}
+func New(jobs jobrepo.Repository, runs jobrunrepo.Repository, logs logrepo.Repository, queue queue.Queue, leases dispatcherlease.Manager, cancels *dispatchercancel.Manager, executors *executor.Registry) *Loop {
+	if cancels == nil {
+		cancels = dispatchercancel.NewManager()
+	}
+	return &Loop{jobs: jobs, runs: runs, logs: logs, queue: queue, leases: leases, cancels: cancels, executors: executors}
 }
 
 func (l *Loop) Start(ctx context.Context, interval time.Duration) {
@@ -94,7 +99,23 @@ func (l *Loop) tick(ctx context.Context) {
 		return
 	}
 
-	result, err := execImpl.Execute(ctx, executor.Request{Job: job, Run: run})
+	runCtx, cancel := context.WithCancel(ctx)
+	l.cancels.Register(run.ID, cancel)
+	defer func() {
+		l.cancels.Remove(run.ID)
+		cancel()
+	}()
+
+	result, err := execImpl.Execute(runCtx, executor.Request{Job: job, Run: run})
+	if runCtx.Err() == context.Canceled {
+		run.Status = jobrundomain.StatusCanceled
+		run.Message = "canceled while running"
+		run.FinishedAt = time.Now().UTC()
+		run.UpdatedAt = run.FinishedAt
+		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: run.UpdatedAt})
+		_ = l.runs.Save(ctx, run)
+		return
+	}
 	if err != nil {
 		run.Status = jobrundomain.StatusFailed
 		run.Message = err.Error()

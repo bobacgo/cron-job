@@ -392,6 +392,8 @@
         <div class="nav">
           <a href="{{ withLang "/" .Lang }}">{{ tr .Dict "nav_dashboard" }}</a>
           <a href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "nav_jobs" }}</a>
+          <a href="{{ withLang "/graph" .Lang }}">{{ tr .Dict "nav_graph" }}</a>
+          <a href="{{ withLang "/audit" .Lang }}">{{ tr .Dict "nav_audit" }}</a>
           <a href="/api/v1/healthz">{{ tr .Dict "nav_health" }}</a>
           <span class="tag">{{ tr .Dict "brand_direction_value" }}</span>
           <span class="lang-group">

@@ -17,11 +17,30 @@ const defaultMethod = "/cronjob.v1.Executor/Run"
 type workerServer struct{}
 
 func (workerServer) Run(_ context.Context, req *sdkprotocol.RunRequest) (*sdkprotocol.RunResponse, error) {
+	version, ok := sdkprotocol.NegotiateVersion(req.ProtocolVersion, req.SupportedVersions)
+	if !ok {
+		return &sdkprotocol.RunResponse{
+			ProtocolVersion: sdkprotocol.CurrentVersion,
+			Status:          "failed",
+			ErrorCode:       sdkprotocol.ErrorCodeInvalidVersion,
+			Message:         "no compatible protocol version",
+		}, nil
+	}
+	if req.JobID == "" || req.RunID == "" {
+		return &sdkprotocol.RunResponse{
+			ProtocolVersion: version,
+			Status:          "failed",
+			ErrorCode:       sdkprotocol.ErrorCodeInvalidRequest,
+			Message:         "job_id and run_id are required",
+		}, nil
+	}
 	message := "worker executed run " + req.RunID
 	return &sdkprotocol.RunResponse{
-		Status:  "succeeded",
-		Message: "ok",
-		Output:  message,
+		ProtocolVersion: version,
+		Status:          "succeeded",
+		ErrorCode:       sdkprotocol.ErrorCodeNone,
+		Message:         "ok",
+		Output:          message,
 	}, nil
 }
 

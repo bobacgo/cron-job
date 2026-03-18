@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -183,6 +185,93 @@ func (h *PageHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	h.render(w, r, "dashboard", data)
 }
 
+func (h *PageHandler) DependencyGraph(w http.ResponseWriter, r *http.Request) {
+	jobs, err := h.service.List(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	nodes := make([]map[string]any, 0, len(jobs))
+	edges := make([]map[string]string, 0)
+	for _, item := range jobs {
+		detail, err := h.service.GetDetail(r.Context(), item.ID)
+		latestStatus := "Pending"
+		failedCount := 0
+		if err == nil {
+			if len(detail.Runs) > 0 {
+				latestStatus = string(detail.Runs[0].Status)
+			}
+			for _, run := range detail.Runs {
+				switch run.Status {
+				case jobrundomain.StatusFailed, jobrundomain.StatusTimedOut, jobrundomain.StatusCanceled:
+					failedCount++
+				}
+			}
+			for _, edge := range detail.Dependencies {
+				edges = append(edges, map[string]string{"job_id": edge.JobID, "depends_on": edge.DependsOnJobID})
+			}
+		}
+		nextRunAt := "-"
+		if !item.NextRunAt.IsZero() {
+			nextRunAt = item.NextRunAt.UTC().Format("2006-01-02 15:04:05Z07:00")
+		}
+		nodes = append(nodes, map[string]any{
+			"id":           item.ID,
+			"name":         item.Name,
+			"latestStatus": latestStatus,
+			"failedCount":  failedCount,
+			"nextRunAt":    nextRunAt,
+		})
+	}
+	sort.Slice(nodes, func(i, j int) bool { return fmt.Sprintf("%v", nodes[i]["name"]) < fmt.Sprintf("%v", nodes[j]["name"]) })
+	markup := buildGraphMarkup(nodes, edges)
+	data := map[string]any{
+		"Title":       tr(dictionary(currentLang(r)), "graph_title", "Dependency Graph"),
+		"GraphNodes":  nodes,
+		"GraphEdges":  edges,
+		"GraphMarkup": markup,
+	}
+	h.render(w, r, "graph", data)
+}
+
+func (h *PageHandler) OpsAudit(w http.ResponseWriter, r *http.Request) {
+	runs, err := h.runs.List(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	statusFilter := strings.TrimSpace(r.URL.Query().Get("status"))
+	keyword := strings.TrimSpace(r.URL.Query().Get("q"))
+	items := make([]jobrundomain.JobRun, 0, len(runs))
+	for _, run := range runs {
+		if statusFilter != "" && string(run.Status) != statusFilter {
+			continue
+		}
+		if keyword != "" {
+			haystack := strings.ToLower(run.JobID + " " + run.ID + " " + run.Message)
+			if !strings.Contains(haystack, strings.ToLower(keyword)) {
+				continue
+			}
+		}
+		items = append(items, run)
+		if len(items) >= 80 {
+			break
+		}
+	}
+	logItems, err := h.logs.Search(r.Context(), logrepo.Query{Contains: keyword, Limit: 50})
+	if err != nil {
+		logItems = nil
+	}
+	data := map[string]any{
+		"Title":         tr(dictionary(currentLang(r)), "audit_title", "Operations Audit"),
+		"AuditRuns":     items,
+		"AuditLogItems": logItems,
+		"AuditStatus":   statusFilter,
+		"AuditQuery":    keyword,
+	}
+	h.render(w, r, "audit", data)
+}
+
 func (h *PageHandler) Jobs(w http.ResponseWriter, r *http.Request) {
 	lang := currentLang(r)
 	dict := dictionary(lang)
@@ -281,11 +370,29 @@ func mustParseTemplates() *template.Template {
 		filepath.Join(baseDir, "web/templates/layout/base.html"),
 		filepath.Join(baseDir, "web/templates/pages/login.html"),
 		filepath.Join(baseDir, "web/templates/pages/dashboard.html"),
+		filepath.Join(baseDir, "web/templates/pages/graph.html"),
+		filepath.Join(baseDir, "web/templates/pages/audit.html"),
 		filepath.Join(baseDir, "web/templates/pages/jobs.html"),
 		filepath.Join(baseDir, "web/templates/pages/job_detail.html"),
 		filepath.Join(baseDir, "web/templates/pages/run_log.html"),
 	}
 	return template.Must(template.New("admin").Funcs(templateFuncs()).ParseFiles(paths...))
+}
+
+func buildGraphMarkup(nodes []map[string]any, edges []map[string]string) string {
+	var b strings.Builder
+	b.WriteString("graph LR\n")
+	for _, node := range nodes {
+		id := strings.ReplaceAll(fmt.Sprintf("%v", node["id"]), "-", "_")
+		name := strings.ReplaceAll(fmt.Sprintf("%v", node["name"]), "\"", "'")
+		b.WriteString(fmt.Sprintf("    %s[\"%s\"]\n", id, name))
+	}
+	for _, edge := range edges {
+		from := strings.ReplaceAll(edge["depends_on"], "-", "_")
+		to := strings.ReplaceAll(edge["job_id"], "-", "_")
+		b.WriteString(fmt.Sprintf("    %s --> %s\n", from, to))
+	}
+	return b.String()
 }
 
 func (h *PageHandler) createJob(w http.ResponseWriter, r *http.Request) {

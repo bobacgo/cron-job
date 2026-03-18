@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package cronjob.v1;
+
+option go_package = "github.com/bobacgo/cron-job/internal/executor/sdk/protocol;protocol";
+
+service Executor {
+  rpc Run(RunRequest) returns (RunResponse);
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_NONE = 1;
+  ERROR_CODE_INVALID_VERSION = 2;
+  ERROR_CODE_INVALID_REQUEST = 3;
+  ERROR_CODE_UNAUTHORIZED = 4;
+  ERROR_CODE_TIMEOUT = 5;
+  ERROR_CODE_INTERNAL = 6;
+}
+
+message RunRequest {
+  string protocol_version = 1;
+  repeated string supported_versions = 2;
+  string job_id = 3;
+  string job_name = 4;
+  string run_id = 5;
+  string scheduled_at = 6;
+  int32 attempt = 7;
+  string trigger_type = 8;
+}
+
+message RunResponse {
+  string protocol_version = 1;
+  string status = 2;
+  ErrorCode error_code = 3;
+  string message = 4;
+  string output = 5;
+}

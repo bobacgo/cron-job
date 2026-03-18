@@ -1,0 +1,387 @@
+{{ define "graph" }}
+{{ template "header" . }}
+
+<app-panel strong>
+  <div class="section-body">
+    <app-kicker>{{ tr .Dict "nav_graph" }}</app-kicker>
+    <h1 class="title" style="font-size:2rem;margin:0.7rem 0 0;">{{ tr .Dict "graph_title" }}</h1>
+    <p class="muted" style="margin:0.6rem 0 0;">{{ tr .Dict "graph_desc" }}</p>
+    <div class="status" style="margin-top:0.7rem;">
+      <span class="dot info"></span>{{ tr .Dict "graph_interactive_hint" }}
+    </div>
+  </div>
+</app-panel>
+
+<app-panel style="margin-top:1rem;">
+  <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;">
+    <div>
+      <div class="eyebrow">{{ tr .Dict "graph_canvas" }}</div>
+      <h2 class="title" style="font-size:1.3rem;margin:0.35rem 0 0;">{{ tr .Dict "graph_title" }}</h2>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+      <span class="status"><span class="dot info"></span>{{ tr .Dict "graph_nodes" }}: {{ len .GraphNodes }}</span>
+      <span class="status"><span class="dot warning"></span>{{ tr .Dict "graph_edges" }}: {{ len .GraphEdges }}</span>
+      <button id="graph-reset" type="button" class="btn-secondary">{{ tr .Dict "graph_reset" }}</button>
+    </div>
+  </div>
+  <div class="section-body" style="padding-top:0.3rem;">
+    <div id="graph-canvas-wrap" style="position:relative;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(7,19,34,0.84);">
+      <svg id="dep-graph-svg" viewBox="0 0 1200 620" style="display:block;width:100%;height:auto;min-height:420px;"></svg>
+      <div id="graph-tooltip" style="position:absolute;display:none;min-width:220px;max-width:280px;padding:0.65rem 0.72rem;border:1px solid rgba(120,181,255,0.45);border-radius:12px;background:rgba(7,19,34,0.96);backdrop-filter:blur(6px);pointer-events:none;z-index:3;box-shadow:0 10px 24px rgba(0,0,0,0.35);">
+        <div class="eyebrow" style="margin-bottom:0.25rem;">{{ tr .Dict "graph_detail_title" }}</div>
+        <div id="tooltip-name" style="font-weight:600;"></div>
+        <div class="muted" style="font-size:0.8rem;margin-top:0.35rem;">{{ tr .Dict "graph_detail_status" }}: <span id="tooltip-status"></span></div>
+        <div class="muted" style="font-size:0.8rem;">{{ tr .Dict "graph_detail_failed" }}: <span id="tooltip-failed"></span></div>
+        <div class="muted" style="font-size:0.8rem;">{{ tr .Dict "graph_detail_next_run" }}: <span id="tooltip-next"></span></div>
+      </div>
+    </div>
+    <div class="muted" style="font-size:0.8rem;margin-top:0.5rem;">{{ tr .Dict "graph_zoom_pan_hint" }}</div>
+  </div>
+</app-panel>
+
+<div class="grid-2" style="margin-top:1rem;">
+  <app-panel>
+    <div class="section-head">
+      <div class="eyebrow">{{ tr .Dict "graph_nodes" }}</div>
+      <h2 class="title" style="font-size:1.3rem;margin:0.35rem 0 0;">{{ len .GraphNodes }}</h2>
+    </div>
+    <div class="section-body" style="display:grid;gap:0.5rem;max-height:420px;overflow:auto;">
+      {{ range .GraphNodes }}
+      <div class="status"><span class="dot info"></span>{{ .name }} <span class="mono muted">{{ .id }}</span></div>
+      {{ else }}
+      <div class="muted">No nodes</div>
+      {{ end }}
+    </div>
+  </app-panel>
+
+  <app-panel>
+    <div class="section-head">
+      <div class="eyebrow">{{ tr .Dict "graph_edges" }}</div>
+      <h2 class="title" style="font-size:1.3rem;margin:0.35rem 0 0;">{{ len .GraphEdges }}</h2>
+    </div>
+    <div class="section-body" style="display:grid;gap:0.5rem;max-height:420px;overflow:auto;">
+      {{ range .GraphEdges }}
+      <div class="status"><span class="dot warning"></span><span class="mono">{{ .depends_on }}</span> -> <span class="mono">{{ .job_id }}</span></div>
+      {{ else }}
+      <div class="muted">No edges</div>
+      {{ end }}
+    </div>
+  </app-panel>
+</div>
+
+<app-panel style="margin-top:1rem;">
+  <div class="section-head">
+    <div class="eyebrow">{{ tr .Dict "graph_source" }}</div>
+    <h2 class="title" style="font-size:1.3rem;margin:0.35rem 0 0;">Mermaid</h2>
+  </div>
+  <div class="section-body">
+    <pre class="mono" style="margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.6;color:#d8eeff;">{{ .GraphMarkup }}</pre>
+  </div>
+</app-panel>
+
+<script>
+(() => {
+  const nodes = [
+    {{- range $i, $n := .GraphNodes }}
+    {
+      id: "{{ $n.id }}",
+      name: "{{ $n.name }}",
+      latestStatus: "{{ $n.latestStatus }}",
+      failedCount: {{ $n.failedCount }},
+      nextRunAt: "{{ $n.nextRunAt }}"
+    },
+    {{- end }}
+  ];
+  const edges = [
+    {{- range $i, $e := .GraphEdges }}
+    { from: "{{ $e.depends_on }}", to: "{{ $e.job_id }}" },
+    {{- end }}
+  ];
+
+  const svg = document.getElementById("dep-graph-svg");
+  const resetBtn = document.getElementById("graph-reset");
+  const canvasWrap = document.getElementById("graph-canvas-wrap");
+  const tooltip = document.getElementById("graph-tooltip");
+  const tooltipName = document.getElementById("tooltip-name");
+  const tooltipStatus = document.getElementById("tooltip-status");
+  const tooltipFailed = document.getElementById("tooltip-failed");
+  const tooltipNext = document.getElementById("tooltip-next");
+  if (!svg || nodes.length === 0) return;
+
+  const width = 1200;
+  const height = 620;
+  const nodeByID = new Map(nodes.map((n) => [n.id, n]));
+  const outgoing = new Map();
+  const incoming = new Map();
+
+  nodes.forEach((n, i) => {
+    const angle = (Math.PI * 2 * i) / Math.max(nodes.length, 1);
+    n.x = width / 2 + Math.cos(angle) * Math.min(420, width * 0.32);
+    n.y = height / 2 + Math.sin(angle) * Math.min(250, height * 0.34);
+  });
+  edges.forEach((e) => {
+    if (!outgoing.has(e.from)) outgoing.set(e.from, []);
+    if (!incoming.has(e.to)) incoming.set(e.to, []);
+    outgoing.get(e.from).push(e.to);
+    incoming.get(e.to).push(e.from);
+  });
+
+  const ns = "http://www.w3.org/2000/svg";
+  const defs = document.createElementNS(ns, "defs");
+  const marker = document.createElementNS(ns, "marker");
+  marker.setAttribute("id", "arrow");
+  marker.setAttribute("viewBox", "0 0 10 10");
+  marker.setAttribute("refX", "9");
+  marker.setAttribute("refY", "5");
+  marker.setAttribute("markerWidth", "6");
+  marker.setAttribute("markerHeight", "6");
+  marker.setAttribute("orient", "auto-start-reverse");
+  const arrowPath = document.createElementNS(ns, "path");
+  arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  arrowPath.setAttribute("fill", "#5daeda");
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const viewport = document.createElementNS(ns, "g");
+  const edgeLayer = document.createElementNS(ns, "g");
+  const nodeLayer = document.createElementNS(ns, "g");
+  svg.appendChild(viewport);
+  viewport.appendChild(edgeLayer);
+  viewport.appendChild(nodeLayer);
+
+  let scale = 1;
+  let panX = 0;
+  let panY = 0;
+  let panState = null;
+
+  function applyViewportTransform() {
+    viewport.setAttribute("transform", `translate(${panX}, ${panY}) scale(${scale})`);
+  }
+
+  const edgeEls = [];
+  edges.forEach((edge) => {
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("stroke", "#5daeda");
+    line.setAttribute("stroke-opacity", "0.55");
+    line.setAttribute("stroke-width", "2.2");
+    line.setAttribute("stroke-dasharray", "6 8");
+    line.style.animation = "edge-flow 1.7s linear infinite";
+    line.setAttribute("marker-end", "url(#arrow)");
+    edgeLayer.appendChild(line);
+    edgeEls.push({ edge, line });
+  });
+
+  const nodeEls = [];
+  nodes.forEach((node) => {
+    const group = document.createElementNS(ns, "g");
+    group.style.cursor = "grab";
+    const circle = document.createElementNS(ns, "circle");
+    circle.setAttribute("r", "26");
+    circle.setAttribute("fill", "#0d2f52");
+    circle.setAttribute("stroke", "#8ad6ff");
+    circle.setAttribute("stroke-width", "2");
+    const label = document.createElementNS(ns, "text");
+    label.setAttribute("fill", "#ecf7ff");
+    label.setAttribute("font-size", "12");
+    label.setAttribute("font-family", "IBM Plex Sans, sans-serif");
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("y", "4");
+    label.textContent = node.name.length > 12 ? (node.name.slice(0, 11) + "…") : node.name;
+    group.appendChild(circle);
+    group.appendChild(label);
+    nodeLayer.appendChild(group);
+    nodeEls.push({ node, group, circle });
+  });
+
+  const style = document.createElement("style");
+  style.textContent = "@keyframes edge-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -42; } }";
+  document.head.appendChild(style);
+
+  let dragged = null;
+  let selected = "";
+
+  function toSVGPoint(clientX, clientY) {
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * width,
+      y: ((clientY - rect.top) / rect.height) * height,
+    };
+  }
+
+  function walk(seed, nextMap) {
+    const seen = new Set();
+    const queue = [seed];
+    while (queue.length) {
+      const cur = queue.shift();
+      const list = nextMap.get(cur) || [];
+      list.forEach((n) => {
+        if (!seen.has(n)) {
+          seen.add(n);
+          queue.push(n);
+        }
+      });
+    }
+    return seen;
+  }
+
+  function applyHighlight() {
+    const descendants = selected ? walk(selected, outgoing) : new Set();
+    const ancestors = selected ? walk(selected, incoming) : new Set();
+    const failedLike = new Set(["Failed", "TimedOut", "Canceled"]);
+
+    nodeEls.forEach((item) => {
+      const { node, circle } = item;
+      const isSelected = selected && node.id === selected;
+      const isDesc = descendants.has(node.id);
+      const isAnc = ancestors.has(node.id);
+      const active = isSelected || isDesc || isAnc;
+
+      circle.setAttribute("fill", isSelected ? "#0fb7e7" : isDesc ? "#0e4f80" : isAnc ? "#5e3d15" : "#0d2f52");
+      circle.setAttribute("stroke", active ? "#d7f5ff" : "#8ad6ff");
+      circle.setAttribute("stroke-width", active ? "3" : "2");
+      item.group.style.opacity = selected && !active ? "0.35" : "1";
+    });
+
+    edgeEls.forEach((item) => {
+      const { edge, line } = item;
+      const toNode = nodeByID.get(edge.to);
+      const failedEdge = !!toNode && failedLike.has(toNode.latestStatus);
+      const onPath = selected && (
+        (edge.from === selected) || (edge.to === selected) ||
+        (descendants.has(edge.to) && (edge.from === selected || descendants.has(edge.from))) ||
+        (ancestors.has(edge.from) && (edge.to === selected || ancestors.has(edge.to)))
+      );
+      const baseColor = failedEdge ? "#f26f80" : "#5daeda";
+      line.setAttribute("stroke", onPath ? "#f5c46b" : baseColor);
+      line.setAttribute("stroke-opacity", selected && !onPath ? "0.18" : "0.62");
+      line.setAttribute("stroke-width", onPath ? "3.2" : "2.2");
+      line.style.animationDuration = onPath ? "0.85s" : "1.7s";
+    });
+  }
+
+  function render() {
+    edgeEls.forEach((item) => {
+      const from = nodeByID.get(item.edge.from);
+      const to = nodeByID.get(item.edge.to);
+      if (!from || !to) return;
+      item.line.setAttribute("x1", String(from.x));
+      item.line.setAttribute("y1", String(from.y));
+      item.line.setAttribute("x2", String(to.x));
+      item.line.setAttribute("y2", String(to.y));
+    });
+    nodeEls.forEach((item) => {
+      item.group.setAttribute("transform", `translate(${item.node.x}, ${item.node.y})`);
+    });
+    applyHighlight();
+  }
+
+  nodeEls.forEach((item) => {
+    item.group.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      dragged = item;
+      item.group.setPointerCapture(ev.pointerId);
+      item.group.style.cursor = "grabbing";
+    });
+    item.group.addEventListener("pointermove", (ev) => {
+      if (!dragged || dragged !== item) return;
+      const p = toSVGPoint(ev.clientX, ev.clientY);
+      item.node.x = Math.max(36, Math.min(width - 36, p.x));
+      item.node.y = Math.max(36, Math.min(height - 36, p.y));
+      render();
+    });
+    item.group.addEventListener("pointerup", (ev) => {
+      if (!dragged) return;
+      item.group.releasePointerCapture(ev.pointerId);
+      item.group.style.cursor = "grab";
+      dragged = null;
+    });
+    item.group.addEventListener("pointerenter", () => {
+      if (!tooltip) return;
+      tooltip.style.display = "block";
+      if (tooltipName) tooltipName.textContent = item.node.name;
+      if (tooltipStatus) tooltipStatus.textContent = item.node.latestStatus || "-";
+      if (tooltipFailed) tooltipFailed.textContent = String(item.node.failedCount ?? 0);
+      if (tooltipNext) tooltipNext.textContent = item.node.nextRunAt || "-";
+    });
+    item.group.addEventListener("pointerleave", () => {
+      if (!tooltip) return;
+      tooltip.style.display = "none";
+    });
+    item.group.addEventListener("pointermove", (ev) => {
+      if (!tooltip || !canvasWrap || tooltip.style.display !== "block") return;
+      const rect = canvasWrap.getBoundingClientRect();
+      const left = Math.min(rect.width - 12, Math.max(12, ev.clientX - rect.left + 14));
+      const top = Math.min(rect.height - 12, Math.max(12, ev.clientY - rect.top + 14));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    });
+    item.group.addEventListener("click", () => {
+      selected = (selected === item.node.id) ? "" : item.node.id;
+      render();
+    });
+  });
+
+  svg.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const sx = ((ev.clientX - rect.left) / rect.width) * width;
+    const sy = ((ev.clientY - rect.top) / rect.height) * height;
+    const worldX = (sx - panX) / scale;
+    const worldY = (sy - panY) / scale;
+    const factor = ev.deltaY < 0 ? 1.08 : 0.92;
+    const nextScale = Math.max(0.45, Math.min(2.9, scale * factor));
+    scale = nextScale;
+    panX = sx - worldX * scale;
+    panY = sy - worldY * scale;
+    applyViewportTransform();
+  }, { passive: false });
+
+  svg.addEventListener("pointerdown", (ev) => {
+    if (ev.target !== svg) return;
+    panState = { x: ev.clientX, y: ev.clientY, startPanX: panX, startPanY: panY };
+    svg.setPointerCapture(ev.pointerId);
+    svg.style.cursor = "grabbing";
+  });
+  svg.addEventListener("pointermove", (ev) => {
+    if (!panState) return;
+    panX = panState.startPanX + (ev.clientX - panState.x);
+    panY = panState.startPanY + (ev.clientY - panState.y);
+    applyViewportTransform();
+  });
+  svg.addEventListener("pointerup", (ev) => {
+    if (!panState) return;
+    panState = null;
+    svg.releasePointerCapture(ev.pointerId);
+    svg.style.cursor = "default";
+  });
+  svg.addEventListener("pointercancel", () => {
+    panState = null;
+    svg.style.cursor = "default";
+  });
+
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      selected = "";
+      scale = 1;
+      panX = 0;
+      panY = 0;
+      const radiusX = Math.min(420, width * 0.32);
+      const radiusY = Math.min(250, height * 0.34);
+      nodes.forEach((n, i) => {
+        const angle = (Math.PI * 2 * i) / Math.max(nodes.length, 1);
+        n.x = width / 2 + Math.cos(angle) * radiusX;
+        n.y = height / 2 + Math.sin(angle) * radiusY;
+      });
+      applyViewportTransform();
+      render();
+    });
+  }
+
+  applyViewportTransform();
+  render();
+})();
+</script>
+
+{{ template "footer" . }}
+{{ end }}

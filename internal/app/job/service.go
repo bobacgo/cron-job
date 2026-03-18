@@ -28,6 +28,7 @@ type Service struct {
 	logs         logrepo.Repository
 	queue        queue.Queue
 	planner      *planner.Planner
+	runCanceler  interface{ Cancel(runID string) bool }
 }
 
 type Detail struct {
@@ -39,6 +40,10 @@ type Detail struct {
 
 func NewService(jobs jobrepo.Repository, runs jobrunrepo.Repository, dependencies dependencyrepo.Repository, logs logrepo.Repository, queue queue.Queue, planner *planner.Planner) *Service {
 	return &Service{jobs: jobs, runs: runs, dependencies: dependencies, logs: logs, queue: queue, planner: planner}
+}
+
+func (s *Service) SetRunCanceler(canceler interface{ Cancel(runID string) bool }) {
+	s.runCanceler = canceler
 }
 
 func (s *Service) Create(ctx context.Context, job jobdomain.Job, dependencyIDs []string) (jobdomain.Job, error) {
@@ -203,6 +208,9 @@ func (s *Service) CancelRun(ctx context.Context, runID string) (jobrundomain.Job
 	switch run.Status {
 	case jobrundomain.StatusSucceeded, jobrundomain.StatusFailed, jobrundomain.StatusTimedOut, jobrundomain.StatusSkipped, jobrundomain.StatusCanceled:
 		return jobrundomain.JobRun{}, fmt.Errorf("run %s is already finished", runID)
+	}
+	if run.Status == jobrundomain.StatusRunning && s.runCanceler != nil {
+		_ = s.runCanceler.Cancel(runID)
 	}
 	run.Status = jobrundomain.StatusCanceled
 	run.Message = "canceled by user"

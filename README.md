@@ -52,6 +52,99 @@ cron-job/
 └── README.md
 ```
 
+## 架构图
+
+### 组件总览
+
+```mermaid
+graph TD
+    subgraph CMD["入口 cmd/"]
+        SERVER["cmd/server\n应用启动 & DI 装配"]
+        SDKWORKER["cmd/sdk-worker\n示例 gRPC SDK Worker"]
+    end
+
+    subgraph TRANSPORT["传输层 internal/transport/"]
+        HTTPAPI["HTTP API\nREST JSON  /api/v1/..."]
+        ADMINUI["Admin UI\nGo Template + Web Components\n/  /jobs  /graph  /audit"]
+    end
+
+    subgraph APP["应用层 internal/app/"]
+        JOBSVC["job.Service\nCRUD · pause/resume\ncancel · retry · log-search"]
+    end
+
+    subgraph SCHED["调度器 internal/scheduler/"]
+        SCHLOOP["ScheduleLoop\ncron / interval\n→ 生成 JobRun (Queued)"]
+        DEPLOOP["DependencyLoop\nDAG 依赖扫描\nBlocked → Ready"]
+    end
+
+    subgraph DISP["分发器 internal/dispatcher/"]
+        QUEUE["ReadyQueue\n内存优先队列"]
+        RUNLOOP["RunLoop\ndispatch · retry · backoff"]
+        LEASE["LeaseManager\n互斥租约（内存）"]
+        CANCEL["CancelManager\n协作式 ctx 取消"]
+    end
+
+    subgraph EXEC["执行器 internal/executor/"]
+        BINARY["BinaryExecutor\n本地子进程"]
+        SDKHTTP["SDK-HTTP\nHTTP v1 协议"]
+        SDKGRPC["SDK-gRPC\ngRPC JSON Codec\n版本协商 + 错误码"]
+    end
+
+    subgraph REPO["存储层 internal/repository/"]
+        SQLITE[("SQLite\njobs\njob_runs\ndependency_edges")]
+        FILELOG[("File Logs\n{runID}-stdout.log\n{runID}-stderr.log")]
+    end
+
+    SERVER --> HTTPAPI & ADMINUI & SCHLOOP & DEPLOOP & RUNLOOP
+    HTTPAPI --> JOBSVC
+    ADMINUI --> JOBSVC
+    JOBSVC --> SQLITE & FILELOG & QUEUE & CANCEL
+    SCHLOOP --> SQLITE & QUEUE
+    DEPLOOP --> SQLITE & QUEUE
+    RUNLOOP --> QUEUE & LEASE & CANCEL & SQLITE & FILELOG
+    RUNLOOP --> BINARY & SDKHTTP & SDKGRPC
+    SDKGRPC -->|"gRPC / JSON Codec"| SDKWORKER
+    SDKHTTP -->|"HTTP POST v1"| SDKWORKER
+```
+
+### JobRun 生命周期
+
+```mermaid
+flowchart LR
+    JOB([Job 定义])
+    JOB -->|"ScheduleLoop 周期扫描\n或手动触发"| QUEUED
+
+    QUEUED["JobRun\nQueued"]
+    QUEUED -->|"存在未完成上游依赖"| BLOCKED
+    QUEUED -->|"无依赖 / 上游已 Succeeded"| READY
+
+    BLOCKED["JobRun\nBlocked"]
+    BLOCKED -->|"DependencyLoop\n上游全部 Succeeded"| READY
+
+    READY["JobRun\nReady"]
+    READY -->|"入 ReadyQueue\nRunLoop 取出 + 加租约"| RUNNING
+
+    RUNNING["JobRun\nRunning"]
+    RUNNING -->|"执行成功"| SUCCEEDED([JobRun\nSucceeded])
+    RUNNING -->|"取消 API\n或 CancelManager"| CANCELED([JobRun\nCanceled])
+    RUNNING -->|"执行失败\n未超重试上限"| BACKOFF["等待退避\n指数 backoff"]
+    RUNNING -->|"执行失败\n超重试上限"| FAILED([JobRun\nFailed])
+    BACKOFF --> READY
+```
+
+### 分层职责
+
+| 层次 | 包路径 | 职责 |
+|------|--------|------|
+| 入口 | `cmd/server` | Bootstrap、DI 装配、优雅停机 |
+| 传输 | `internal/transport/` | HTTP REST API、Admin Go Template 页面 |
+| 应用 | `internal/app/job` | 用例编排（不含存储细节） |
+| 调度 | `internal/scheduler/` | cron/interval 触发、DAG 依赖释放 |
+| 分发 | `internal/dispatcher/` | Ready Queue、Run Loop、租约、取消 |
+| 执行 | `internal/executor/` | Binary、SDK-HTTP、SDK-gRPC 三种执行适配 |
+| 领域 | `internal/domain/` | Job、JobRun、Dependency 模型与状态机 |
+| 存储 | `internal/repository/` | SQLite（job/run/edge）、文件日志 |
+
 ## 启动方式
 
 要求：
@@ -258,22 +351,22 @@ POST /api/v1/job-runs/{runID}/retry
 - `/`：仪表盘
 - `/jobs`：任务列表 + 创建表单
 - `/jobs/{jobID}`：任务详情 + 最近运行记录 + 手动触发 + 暂停恢复
-- `/job-runs/{runID}/logs`：运行日志查看
+- `/job-runs/{runID}/logs`：运行日志查看（支持 stdout/stderr 分流）
+- `/graph`：依赖关系图（交互式 SVG，支持拖拽/缩放/路径高亮/节点详情悬浮卡）
+- `/audit`：运维审计页（近期运行事件 + 日志检索命中）
 
 ## 当前限制
 
-当前实现仍然是骨架阶段，下面这些能力还没有完成：
-
-- 更完整的重试和退避策略
-- 依赖图可视化页面
-- 更细粒度的 RBAC
-- 按调度窗口关联的依赖编排
-- 分布式 worker 和高可用调度
+- 租约和队列为内存实现，重启后丢失 Ready 状态的任务（会在下次 ScheduleLoop 扫描时重新生成）
+- 依赖关联粒度为"最新运行状态"，没有按调度窗口精确绑定上下游 run
+- 未实现 PostgreSQL 仓储和迁移版本管理
+- 缺少细粒度 RBAC（当前仅单账号 session cookie）
+- 无分布式 worker 和高可用调度
 
 ## 建议的下一步
 
-1. 补充 PostgreSQL 仓储实现，并增加迁移版本管理。
-2. 为取消动作增加运行中任务的协作式中断能力。
-3. 完善 gRPC SDK 协议（proto 固化、版本协商、错误码语义）。
-4. 扩展测试覆盖到 dispatcher 重试链路与 API handler。
-5. 增加依赖图可视化和运维审计页。
+1. 补充 PostgreSQL 仓储实现，增加 goose 迁移版本管理。
+2. 依赖编排升级：支持按调度窗口匹配上下游 run，支持 trigger rule（all_success / any_success）。
+3. 依赖图增强：框选多节点批量高亮子图，自动布局切换（环形 / 分层 DAG）。
+4. 分布式考量：将 ReadyQueue 替换为 Redis Stream，LeaseManager 替换为 Redis SetNX。
+5. 更细粒度 RBAC：多角色 + API key 认证。
