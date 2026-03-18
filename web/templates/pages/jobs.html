@@ -1,88 +1,68 @@
 {{ define "jobs" }}
 {{ template "header" . }}
-<div class="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-  <div>
-    <div class="app-kicker">{{ tr .Dict "jobs_kicker" }}</div>
-    <h1 class="app-title mt-4 text-4xl font-bold tracking-tight md:text-5xl">{{ tr .Dict "jobs_title" }}</h1>
-    <p class="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--app-muted)]">{{ tr .Dict "jobs_desc" }}</p>
+
+<app-panel strong>
+  <div class="section-body">
+    <app-kicker>{{ tr .Dict "jobs_kicker" }}</app-kicker>
+    <h1 class="title" style="font-size:2.1rem;margin:0.72rem 0 0;">{{ tr .Dict "jobs_title" }}</h1>
+    <p class="muted" style="margin:0.6rem 0 0;max-width:860px;line-height:1.65;">{{ tr .Dict "jobs_desc" }}</p>
   </div>
-  <div class="app-brand-badge">{{ tr .Dict "mvp_console" }}</div>
+</app-panel>
+
+<div class="grid-4" style="margin-top:1rem;">
+  <metric-tile><div class="metric-label">{{ tr .Dict "visible_jobs" }}</div><div class="metric-value">{{ .VisibleJobs }}</div></metric-tile>
+  <metric-tile><div class="metric-label">{{ tr .Dict "status_enabled" }}</div><div class="metric-value" style="color:var(--success);">{{ .EnabledCount }}</div></metric-tile>
+  <metric-tile><div class="metric-label">{{ tr .Dict "status_disabled" }}</div><div class="metric-value" style="color:var(--warning);">{{ .DisabledCount }}</div></metric-tile>
+  <metric-tile><div class="metric-label">{{ tr .Dict "automation_mix" }}</div><div class="metric-value">{{ .SDKCount }}/{{ .BinaryCount }}</div></metric-tile>
 </div>
 
-<div class="mb-6 app-summary-grid">
-  <div class="app-summary-card">
-    <div class="app-eyebrow">{{ tr .Dict "visible_jobs" }}</div>
-    <div class="app-summary-value text-white">{{ .VisibleJobs }}</div>
-    <div class="mt-3 text-sm text-[color:var(--app-muted)]">{{ .TotalJobs }} {{ tr .Dict "entries" }}</div>
+<app-panel style="margin-top:1rem;">
+  <div class="section-head">
+    <div class="eyebrow">{{ tr .Dict "filter_bar" }}</div>
+    <h2 class="title" style="font-size:1.45rem;margin:0.35rem 0 0;">{{ tr .Dict "status_summary" }}</h2>
   </div>
-  <div class="app-summary-card">
-    <div class="app-eyebrow">{{ tr .Dict "status_enabled" }}</div>
-    <div class="app-summary-value text-[color:var(--app-success)]">{{ .EnabledCount }}</div>
-    <div class="mt-3 text-sm text-[color:var(--app-muted)]">{{ tr .Dict "status_summary" }}</div>
-  </div>
-  <div class="app-summary-card">
-    <div class="app-eyebrow">{{ tr .Dict "status_disabled" }}</div>
-    <div class="app-summary-value text-[color:var(--app-warning)]">{{ .DisabledCount }}</div>
-    <div class="mt-3 text-sm text-[color:var(--app-muted)]">{{ tr .Dict "status_summary" }}</div>
-  </div>
-  <div class="app-summary-card">
-    <div class="app-eyebrow">{{ tr .Dict "automation_mix" }}</div>
-    <div class="app-summary-value text-[color:var(--app-accent-deep)]">{{ .SDKCount }}/{{ .BinaryCount }}</div>
-    <div class="mt-3 text-sm text-[color:var(--app-muted)]">SDK / Binary</div>
-  </div>
-</div>
-
-<div class="mb-6 app-filter-shell">
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <div class="app-eyebrow">{{ tr .Dict "filter_bar" }}</div>
-      <div class="mt-1 text-xl font-semibold text-white">{{ tr .Dict "status_summary" }}</div>
-    </div>
-    <a class="btn btn-sm rounded-full border border-[color:var(--app-border)] bg-[rgba(10,26,46,0.76)] text-[color:var(--app-ink)] shadow-none hover:border-[color:var(--app-border-strong)] hover:bg-[rgba(14,34,58,0.94)]" href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "filter_reset" }}</a>
-  </div>
-  <form class="grid gap-4 lg:grid-cols-[1.2fr,0.55fr,0.55fr,auto]" method="get" action="/jobs">
-    <input type="hidden" name="lang" value="{{ .Lang }}">
-    <label class="form-control w-full">
-      <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "filter_search" }}</span></div>
-      <input class="input app-input app-code w-full" name="q" value="{{ .FilterQuery }}" placeholder="{{ tr .Dict "filter_search_hint" }}">
-    </label>
-    <label class="form-control w-full">
-      <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "filter_status" }}</span></div>
-      <select class="select app-select w-full" name="status">
-        <option value="" {{ if eq .FilterStatus "" }}selected{{ end }}>{{ tr .Dict "status_all" }}</option>
-        <option value="enabled" {{ if eq .FilterStatus "enabled" }}selected{{ end }}>{{ tr .Dict "status_enabled" }}</option>
-        <option value="disabled" {{ if eq .FilterStatus "disabled" }}selected{{ end }}>{{ tr .Dict "status_disabled" }}</option>
-      </select>
-    </label>
-    <label class="form-control w-full">
-      <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "filter_executor" }}</span></div>
-      <select class="select app-select w-full" name="executor">
-        <option value="" {{ if eq .FilterExecutor "" }}selected{{ end }}>{{ tr .Dict "executor_all" }}</option>
-        <option value="sdk" {{ if eq .FilterExecutor "sdk" }}selected{{ end }}>SDK</option>
-        <option value="binary" {{ if eq .FilterExecutor "binary" }}selected{{ end }}>Binary</option>
-      </select>
-    </label>
-    <div class="flex items-end">
-      <button class="btn w-full rounded-full border-0 bg-[color:var(--app-accent)] text-slate-950 shadow-none hover:bg-[color:var(--app-accent-deep)]" type="submit">{{ tr .Dict "filter_apply" }}</button>
-    </div>
-  </form>
-</div>
-
-<div class="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-  <div class="app-panel p-4 md:p-5">
-    <div class="flex items-center justify-between border-b border-[color:var(--app-border)] px-6 py-5">
-      <div>
-        <div class="app-eyebrow">{{ tr .Dict "inventory" }}</div>
-        <div class="app-section-title mt-1 text-2xl font-semibold">{{ tr .Dict "defined_jobs" }}</div>
+  <div class="section-body">
+    <form method="get" action="/jobs" class="grid-4" style="align-items:end;">
+      <input type="hidden" name="lang" value="{{ .Lang }}">
+      <div class="field">
+        <label>{{ tr .Dict "filter_search" }}</label>
+        <input name="q" value="{{ .FilterQuery }}" placeholder="{{ tr .Dict "filter_search_hint" }}">
       </div>
-      <div class="app-code text-xs text-[color:var(--app-muted)]">{{ .VisibleJobs }} / {{ .TotalJobs }} {{ tr .Dict "entries" }}</div>
+      <div class="field">
+        <label>{{ tr .Dict "filter_status" }}</label>
+        <select name="status">
+          <option value="" {{ if eq .FilterStatus "" }}selected{{ end }}>{{ tr .Dict "status_all" }}</option>
+          <option value="enabled" {{ if eq .FilterStatus "enabled" }}selected{{ end }}>{{ tr .Dict "status_enabled" }}</option>
+          <option value="disabled" {{ if eq .FilterStatus "disabled" }}selected{{ end }}>{{ tr .Dict "status_disabled" }}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>{{ tr .Dict "filter_executor" }}</label>
+        <select name="executor">
+          <option value="" {{ if eq .FilterExecutor "" }}selected{{ end }}>{{ tr .Dict "executor_all" }}</option>
+          <option value="sdk" {{ if eq .FilterExecutor "sdk" }}selected{{ end }}>SDK</option>
+          <option value="binary" {{ if eq .FilterExecutor "binary" }}selected{{ end }}>Binary</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button class="btn-primary" type="submit">{{ tr .Dict "filter_apply" }}</button>
+        <a class="btn-secondary" href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "filter_reset" }}</a>
+      </div>
+    </form>
+  </div>
+</app-panel>
+
+<div class="grid-2" style="margin-top:1rem;">
+  <app-panel>
+    <div class="section-head">
+      <div class="eyebrow">{{ tr .Dict "inventory" }}</div>
+      <h2 class="title" style="font-size:1.45rem;margin:0.35rem 0 0;">{{ tr .Dict "defined_jobs" }}</h2>
     </div>
-    <div class="app-table-wrap mt-4 overflow-x-auto">
-      <table class="table app-table">
+    <div class="section-body" style="overflow:auto;">
+      <table>
         <thead>
           <tr>
             <th>{{ tr .Dict "table_name" }}</th>
-            <th>{{ tr .Dict "table_id" }}</th>
             <th>{{ tr .Dict "table_executor" }}</th>
             <th>{{ tr .Dict "table_schedule" }}</th>
             <th>{{ tr .Dict "table_next_run" }}</th>
@@ -94,118 +74,92 @@
           {{ range .Jobs }}
           <tr>
             <td>
-              <a class="text-base font-semibold text-white no-underline hover:text-[color:var(--app-accent-deep)]" href="{{ withLang (printf "/jobs/%s" .ID) $.Lang }}">{{ .Name }}</a>
-              <div class="mt-1 max-w-sm text-xs leading-5 text-[color:var(--app-muted)]">{{ .Description }}</div>
+              <div style="font-weight:600;">{{ .Name }}</div>
+              <div class="muted" style="font-size:0.8rem;margin-top:0.18rem;">{{ .Description }}</div>
             </td>
-            <td>
-              <div class="flex items-center gap-2">
-                {{ if .Enabled }}
-                <span class="app-signal-dot text-[color:var(--app-success)]"></span>
-                {{ else }}
-                <span class="app-signal-dot text-[color:var(--app-warning)]"></span>
-                {{ end }}
-                <span class="app-code text-xs text-[color:var(--app-muted)]">{{ .ID }}</span>
-              </div>
-            </td>
-            <td><span class="badge border border-[color:var(--app-border)] bg-[rgba(57,198,244,0.12)] text-[color:var(--app-accent-deep)]">{{ .Executor }}</span></td>
-            <td><span class="app-code text-xs text-[color:var(--app-ink)]">{{ .Schedule }}</span></td>
-            <td class="text-sm text-[color:var(--app-muted)]">{{ .NextRunAt }}</td>
+            <td><span class="status">{{ .Executor }}</span></td>
+            <td class="mono" style="font-size:0.78rem;">{{ .Schedule }}</td>
+            <td class="muted" style="font-size:0.82rem;">{{ .NextRunAt }}</td>
             <td>
               {{ if .Enabled }}
-              <span class="badge border-0 bg-emerald-400/15 text-emerald-300 badge-sm">{{ tr $.Dict "status_enabled" }}</span>
+              <span class="status"><span class="dot success"></span>{{ tr $.Dict "status_enabled" }}</span>
               {{ else }}
-              <span class="badge border-0 bg-amber-400/15 text-amber-300 badge-sm">{{ tr $.Dict "status_disabled" }}</span>
+              <span class="status"><span class="dot warning"></span>{{ tr $.Dict "status_disabled" }}</span>
               {{ end }}
             </td>
-            <td>
-              <a class="btn btn-sm rounded-full border border-[color:var(--app-border)] bg-[rgba(10,26,46,0.76)] text-[color:var(--app-ink)] shadow-none hover:border-[color:var(--app-border-strong)] hover:bg-[rgba(14,34,58,0.94)]" href="{{ withLang (printf "/jobs/%s" .ID) $.Lang }}">{{ tr $.Dict "button_open_job" }}</a>
-            </td>
+            <td><a class="btn-secondary" href="{{ withLang (printf "/jobs/%s" .ID) $.Lang }}">{{ tr $.Dict "button_open_job" }}</a></td>
           </tr>
           {{ else }}
-          <tr><td colspan="7" class="py-10 text-center text-sm text-[color:var(--app-muted)]">{{ tr .Dict "no_jobs" }}</td></tr>
+          <tr><td colspan="6" class="muted">{{ tr .Dict "no_jobs" }}</td></tr>
           {{ end }}
         </tbody>
       </table>
     </div>
-  </div>
+  </app-panel>
 
-  <div class="app-panel app-panel-strong p-6 md:p-8">
-    <div class="app-eyebrow">{{ tr .Dict "compose" }}</div>
-    <h2 class="app-section-title mt-2 text-3xl font-bold tracking-tight">{{ tr .Dict "create_job" }}</h2>
-    <p class="mt-3 text-sm leading-7 text-[color:var(--app-muted)]">{{ tr .Dict "create_job_desc" }}</p>
-    <form class="mt-4 space-y-4" method="post" action="{{ withLang "/jobs" .Lang }}">
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_name" }}</span></div>
-        <input class="input app-input input-bordered w-full" name="name" required>
-      </label>
+  <app-panel strong>
+    <div class="section-head">
+      <div class="eyebrow">{{ tr .Dict "compose" }}</div>
+      <h2 class="title" style="font-size:1.45rem;margin:0.35rem 0 0;">{{ tr .Dict "create_job" }}</h2>
+    </div>
+    <div class="section-body">
+      <form method="post" action="{{ withLang "/jobs" .Lang }}" style="display:grid;gap:0.72rem;">
+        <div class="field"><label>{{ tr .Dict "field_name" }}</label><input name="name" required></div>
+        <div class="field"><label>{{ tr .Dict "field_description" }}</label><textarea name="description"></textarea></div>
 
-      <label class="form-control w-full">
-        <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_description" }}</span></div>
-        <textarea class="textarea app-textarea textarea-bordered w-full" name="description" rows="2"></textarea>
-      </label>
-
-      <div class="grid gap-4 md:grid-cols-2">
-        <label class="form-control">
-          <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_interval_seconds" }}</span></div>
-          <input class="input app-input input-bordered" type="number" min="0" name="interval_seconds" value="60">
-        </label>
-        <label class="form-control">
-          <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_cron" }}</span></div>
-          <input class="input app-input input-bordered app-code" name="cron" placeholder="0 * * * *">
-        </label>
-      </div>
-
-      <div class="grid gap-4 md:grid-cols-2">
-        <label class="form-control">
-          <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_time_zone" }}</span></div>
-          <input class="input app-input input-bordered" name="time_zone" value="UTC">
-        </label>
-        <label class="form-control">
-          <div class="label"><span class="label-text text-[color:var(--app-muted)]">{{ tr .Dict "field_executor_type" }}</span></div>
-          <select class="select app-select select-bordered" name="executor_type">
-            <option value="sdk">SDK</option>
-            <option value="binary">Binary</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="rounded-[24px] border border-[color:var(--app-border)] bg-[rgba(7,18,32,0.84)] p-4 md:p-5">
-        <div class="app-eyebrow">{{ tr .Dict "sdk_settings" }}</div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <input class="input app-input input-bordered" name="sdk_protocol" value="http" placeholder="http">
-          <input class="input app-input input-bordered app-code" name="sdk_method" value="POST" placeholder="POST">
+        <div class="grid-2">
+          <div class="field"><label>{{ tr .Dict "field_interval_seconds" }}</label><input type="number" min="0" name="interval_seconds" value="60"></div>
+          <div class="field"><label>{{ tr .Dict "field_cron" }}</label><input name="cron" placeholder="0 * * * *"></div>
         </div>
-        <input class="input app-input input-bordered app-code mt-4 w-full" name="sdk_url" placeholder="https://service.example.com/tasks/run">
-      </div>
 
-      <div class="rounded-[24px] border border-[color:var(--app-border)] bg-[rgba(7,18,32,0.84)] p-4 md:p-5">
-        <div class="app-eyebrow">{{ tr .Dict "binary_settings" }}</div>
-        <input class="input app-input input-bordered app-code w-full" name="binary_command" placeholder="/usr/local/bin/backup.sh">
-        <textarea class="textarea app-textarea textarea-bordered app-code mt-4 w-full" name="binary_args" rows="2" placeholder="--full,--target=/data"></textarea>
-      </div>
-
-      <div>
-        <div class="app-eyebrow mb-3">{{ tr .Dict "dependencies" }}</div>
-        <div class="max-h-40 space-y-2 overflow-auto rounded-[22px] border border-[color:var(--app-border)] bg-[rgba(7,18,32,0.84)] p-3">
-          {{ range .DependencyOptions }}
-          <label class="label cursor-pointer justify-start gap-3 rounded-xl px-3 py-2 hover:bg-[rgba(57,198,244,0.08)]">
-            <input class="checkbox checkbox-sm" type="checkbox" name="dependency_id" value="{{ .ID }}">
-            <span class="label-text text-[color:var(--app-ink)]">{{ .Name }}</span>
-          </label>
-          {{ else }}
-          <div class="text-sm text-[color:var(--app-muted)]">{{ tr .Dict "no_dependency_options" }}</div>
-          {{ end }}
+        <div class="grid-2">
+          <div class="field"><label>{{ tr .Dict "field_time_zone" }}</label><input name="time_zone" value="UTC"></div>
+          <div class="field"><label>{{ tr .Dict "field_executor_type" }}</label><select name="executor_type"><option value="sdk">SDK</option><option value="binary">Binary</option></select></div>
         </div>
-      </div>
 
-      <label class="label cursor-pointer justify-start gap-3">
-        <input class="checkbox" type="checkbox" name="enabled" checked>
-        <span class="label-text text-[color:var(--app-ink)]">{{ tr .Dict "field_enabled" }}</span>
-      </label>
+        <app-panel>
+          <div class="section-body" style="padding:0.8rem;display:grid;gap:0.7rem;">
+            <div class="eyebrow">{{ tr .Dict "sdk_settings" }}</div>
+            <div class="grid-2">
+              <div class="field"><label>Protocol</label><input name="sdk_protocol" value="http"></div>
+              <div class="field"><label>Method</label><input class="mono" name="sdk_method" value="POST"></div>
+            </div>
+            <div class="field"><label>URL</label><input class="mono" name="sdk_url" placeholder="https://service.example.com/run"></div>
+          </div>
+        </app-panel>
 
-      <button class="btn w-full rounded-full border-0 bg-[color:var(--app-accent)] text-slate-950 shadow-none hover:bg-[color:var(--app-accent-deep)]" type="submit">{{ tr .Dict "button_create_job" }}</button>
-    </form>
-  </div>
+        <app-panel>
+          <div class="section-body" style="padding:0.8rem;display:grid;gap:0.7rem;">
+            <div class="eyebrow">{{ tr .Dict "binary_settings" }}</div>
+            <div class="field"><label>Command</label><input class="mono" name="binary_command" placeholder="/usr/local/bin/backup.sh"></div>
+            <div class="field"><label>Args</label><textarea class="mono" name="binary_args" placeholder="--full,--target=/data"></textarea></div>
+          </div>
+        </app-panel>
+
+        <div class="field">
+          <label>{{ tr .Dict "dependencies" }}</label>
+          <div style="max-height:135px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:0.5rem;background:rgba(7,19,34,0.82);">
+            {{ range .DependencyOptions }}
+            <label style="display:flex;align-items:center;gap:0.45rem;padding:0.3rem 0.1rem;">
+              <input type="checkbox" name="dependency_id" value="{{ .ID }}">
+              <span>{{ .Name }}</span>
+            </label>
+            {{ else }}
+            <div class="muted">{{ tr .Dict "no_dependency_options" }}</div>
+            {{ end }}
+          </div>
+        </div>
+
+        <label style="display:flex;gap:0.45rem;align-items:center;">
+          <input type="checkbox" name="enabled" checked>
+          <span>{{ tr .Dict "field_enabled" }}</span>
+        </label>
+
+        <button class="btn-primary" type="submit">{{ tr .Dict "button_create_job" }}</button>
+      </form>
+    </div>
+  </app-panel>
 </div>
+
 {{ template "footer" . }}
 {{ end }}

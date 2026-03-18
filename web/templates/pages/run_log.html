@@ -1,43 +1,37 @@
 {{ define "run_log" }}
 {{ template "header" . }}
-<section class="app-panel app-panel-strong mb-8 overflow-hidden px-6 py-8 md:px-8 md:py-10">
-  <div class="grid gap-8 xl:grid-cols-[1.2fr,0.8fr] xl:items-start">
-    <div>
-      <div class="app-crumbs">
-        <a class="app-link-muted" href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "nav_jobs" }}</a>
-        <span class="app-crumbs-sep">/</span>
-        <span>{{ tr .Dict "run_log" }}</span>
-      </div>
-      <div class="app-kicker mt-4">{{ tr .Dict "run_forensics" }}</div>
-      <h1 class="app-title mt-5 text-4xl font-bold tracking-tight md:text-6xl">{{ tr .Dict "run_log" }}</h1>
-      <p class="mt-4 max-w-3xl text-sm leading-7 text-[color:var(--app-muted)] md:text-base">{{ tr .Dict "run_forensics_desc" }}</p>
-    </div>
-    <div class="app-side-stack">
-      <div class="rounded-[24px] border border-[color:var(--app-border)] bg-[rgba(6,18,31,0.76)] p-5">
-        <div class="app-eyebrow">{{ tr .Dict "run_id" }}</div>
-        <div class="app-meta-value app-code break-all text-sm">{{ .RunID }}</div>
-      </div>
-      <div class="rounded-[24px] border border-[color:var(--app-border)] bg-[rgba(6,18,31,0.76)] p-5">
-        <div class="app-eyebrow">{{ tr .Dict "terminal_stream" }}</div>
-        <div class="mt-2 text-sm text-[color:var(--app-muted)]">{{ tr .Dict "raw_output" }}</div>
-      </div>
-    </div>
-  </div>
-</section>
 
-<div class="app-terminal-frame">
-  <div class="app-terminal-topbar">
-    <div class="app-terminal-dots">
-      <span class="app-terminal-dot bg-rose-400"></span>
-      <span class="app-terminal-dot bg-amber-300"></span>
-      <span class="app-terminal-dot bg-emerald-400"></span>
+<app-panel strong>
+  <div class="section-body">
+    <app-kicker>{{ tr .Dict "run_forensics" }}</app-kicker>
+    <h1 class="title" style="font-size:2.2rem;margin:0.72rem 0 0;">{{ tr .Dict "run_log" }}</h1>
+    <p class="muted" style="margin:0.62rem 0 0;line-height:1.65;">{{ tr .Dict "run_forensics_desc" }}</p>
+    <div class="status" style="margin-top:0.78rem;"><span class="dot info"></span>{{ tr .Dict "run_id" }}: <span class="mono">{{ .RunID }}</span></div>
+  </div>
+</app-panel>
+
+<app-panel style="margin-top:1rem;">
+  <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;gap:0.7rem;flex-wrap:wrap;">
+    <div>
+      <div class="eyebrow">{{ tr .Dict "terminal_stream" }}</div>
+      <h2 class="title" style="font-size:1.45rem;margin:0.35rem 0 0;">{{ tr .Dict "captured_output" }}</h2>
     </div>
-    <div class="app-eyebrow">{{ tr .Dict "captured_output" }}</div>
-    <div class="app-code text-xs text-[color:var(--app-muted)]">{{ .RunID }}</div>
+    <span class="tag mono">{{ .RunID }}</span>
   </div>
-  <div class="app-terminal-body">
-    <pre class="app-code whitespace-pre-wrap break-words text-sm leading-7">{{ if .Content }}{{ .Content }}{{ else }}{{ tr .Dict "no_log_content" }}{{ end }}</pre>
+  <div class="section-body" style="padding-top:0.3rem;">
+    <div style="border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#040d18,#030914);overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0.72rem;border-bottom:1px solid rgba(120,181,255,0.14);background:rgba(8,19,34,0.92);">
+        <div style="display:flex;gap:0.35rem;">
+          <span class="dot danger"></span>
+          <span class="dot warning"></span>
+          <span class="dot success"></span>
+        </div>
+        <span class="eyebrow">{{ tr .Dict "raw_output" }}</span>
+      </div>
+      <pre class="mono" style="margin:0;padding:0.9rem;white-space:pre-wrap;word-break:break-word;line-height:1.65;font-size:0.84rem;color:#d8eeff;">{{ if .Content }}{{ .Content }}{{ else }}{{ tr .Dict "no_log_content" }}{{ end }}</pre>
+    </div>
   </div>
-</div>
+</app-panel>
+
 {{ template "footer" . }}
 {{ end }}

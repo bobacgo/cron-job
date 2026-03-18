@@ -1,6 +1,6 @@
 {{ define "header" }}
 <!doctype html>
-<html lang="{{ .Lang }}" data-theme="dim">
+<html lang="{{ .Lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,492 +8,412 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style>
     :root {
-    --app-bg: #07111f;
-    --app-bg-deep: #040914;
-    --app-surface: rgba(10, 24, 43, 0.82);
-    --app-surface-strong: rgba(11, 28, 52, 0.94);
-    --app-surface-soft: rgba(12, 38, 69, 0.6);
-    --app-border: rgba(120, 181, 255, 0.16);
-    --app-border-strong: rgba(120, 181, 255, 0.32);
-    --app-ink: #edf6ff;
-    --app-muted: #90a8c7;
-    --app-accent: #39c6f4;
-    --app-accent-soft: rgba(57, 198, 244, 0.18);
-    --app-accent-deep: #97edff;
-    --app-success: #4ade80;
-    --app-warning: #f59e0b;
-    --app-danger: #fb7185;
-    --app-shadow: 0 32px 90px rgba(1, 9, 20, 0.42);
-    --app-radius: 26px;
+      --bg: #081324;
+      --bg2: #030b16;
+      --panel: rgba(11, 28, 49, 0.82);
+      --panel-strong: rgba(8, 22, 40, 0.95);
+      --line: rgba(120, 181, 255, 0.16);
+      --line-strong: rgba(120, 181, 255, 0.34);
+      --ink: #eaf5ff;
+      --muted: #90aac8;
+      --accent: #39c6f4;
+      --accent-deep: #92ebff;
+      --danger: #fb7185;
+      --warning: #f59e0b;
+      --success: #22c55e;
+      --radius: 20px;
+      --shadow: 0 26px 80px rgba(1, 9, 20, 0.45);
     }
 
-    body.app-shell {
-    font-family: "IBM Plex Sans", sans-serif;
-      color: var(--app-ink);
-      background:
-    radial-gradient(circle at top left, rgba(57, 198, 244, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(99, 102, 241, 0.2), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.12), transparent 26%),
-    linear-gradient(180deg, #091323 0%, var(--app-bg) 52%, var(--app-bg-deep) 100%);
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
       min-height: 100vh;
-    position: relative;
-    }
-
-    body.app-shell::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image:
-    linear-gradient(rgba(120, 181, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 181, 255, 0.05) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.52), transparent 92%);
-    pointer-events: none;
-    z-index: 0;
-    }
-
-    .app-chrome {
+      font-family: "IBM Plex Sans", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(57,198,244,0.2), transparent 24%),
+        radial-gradient(circle at 100% 0%, rgba(79,70,229,0.2), transparent 22%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
       position: relative;
-      overflow: hidden;
     }
 
-    .app-chrome::before,
-    .app-chrome::after {
+    body::before {
       content: "";
       position: fixed;
-      inset: auto;
-      border-radius: 999px;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(120,181,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,181,255,0.05) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.55), transparent 92%);
       pointer-events: none;
-      filter: blur(14px);
-      opacity: 0.45;
       z-index: 0;
     }
 
-    .app-chrome::before {
-      width: 18rem;
-      height: 18rem;
-      top: 5rem;
-      right: -4rem;
-	  background: rgba(57, 198, 244, 0.2);
-    }
-
-    .app-chrome::after {
-      width: 14rem;
-      height: 14rem;
-      bottom: 4rem;
-      left: -3rem;
-	  background: rgba(99, 102, 241, 0.2);
-    }
-
-    .app-nav {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      backdrop-filter: blur(18px);
-	  background: rgba(5, 13, 24, 0.72);
-	  border-bottom: 1px solid rgba(120, 181, 255, 0.12);
-    }
-
-    .app-panel {
+    app-shell {
+      display: block;
+      min-height: 100vh;
       position: relative;
       z-index: 1;
-      border: 1px solid var(--app-border);
-      background: var(--app-surface);
-      box-shadow: var(--app-shadow);
-      border-radius: var(--app-radius);
+    }
+
+    .topbar-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(6, 15, 28, 0.76);
       backdrop-filter: blur(16px);
-      overflow: hidden;
+      border-bottom: 1px solid rgba(120,181,255,0.12);
     }
 
-    .app-panel::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 28%);
-      pointer-events: none;
-    }
-
-    .app-panel-strong {
-	  background:
-		linear-gradient(180deg, rgba(17, 37, 66, 0.94), rgba(9, 21, 39, 0.96)),
-		var(--app-surface-strong);
-    }
-
-    .app-eyebrow {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.74rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-	  color: #7bbaf8;
-    }
-
-    .app-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-	  border: 1px solid rgba(57, 198, 244, 0.2);
-	  background: rgba(57, 198, 244, 0.12);
-	  color: var(--app-accent-deep);
-      border-radius: 999px;
-      padding: 0.5rem 0.85rem;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.75rem;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
-    }
-
-    .app-stat {
-      border-radius: 24px;
-      border: 1px solid var(--app-border);
-	  background: linear-gradient(180deg, rgba(12, 31, 55, 0.94), rgba(8, 21, 37, 0.94));
-	  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    }
-
-    .app-stat-value {
-      font-size: clamp(2rem, 4vw, 3.2rem);
-      line-height: 1;
-      font-weight: 700;
-      font-family: "Rajdhani", sans-serif;
-      letter-spacing: 0.03em;
-    }
-
-    .app-table thead th {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.74rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-	  color: #8eb8df;
-      background: transparent;
-      border-bottom-color: rgba(120, 181, 255, 0.1);
-    }
-
-    .app-table tbody tr {
-	  border-color: rgba(120, 181, 255, 0.08);
-    }
-
-    .app-table tbody tr:hover {
-	  background: rgba(57, 198, 244, 0.06);
-    }
-
-    .app-input,
-    .app-select,
-    .app-textarea {
-	  border-color: rgba(120, 181, 255, 0.16) !important;
-	  background: rgba(7, 19, 34, 0.92) !important;
-	  color: var(--app-ink) !important;
-      box-shadow: none !important;
-    }
-
-    .app-input:focus,
-    .app-select:focus,
-    .app-textarea:focus {
-      outline: none !important;
-	  border-color: rgba(57, 198, 244, 0.56) !important;
-	  box-shadow: 0 0 0 4px rgba(57, 198, 244, 0.12) !important;
-    }
-
-    .app-code {
-      font-family: "IBM Plex Mono", monospace;
-    }
-
-    .app-title {
-      font-family: "Rajdhani", sans-serif;
-      letter-spacing: 0.03em;
-    }
-
-    .app-brand-badge {
-      border: 1px solid rgba(57, 198, 244, 0.2);
-      background: rgba(57, 198, 244, 0.08);
-      color: var(--app-accent-deep);
-      border-radius: 999px;
-      padding: 0.35rem 0.7rem;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .app-monitor-grid {
-      display: grid;
-      gap: 1.25rem;
-    }
-
-    .app-signal-band {
-      display: grid;
-      gap: 0.9rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .app-signal-card {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      background: rgba(8, 20, 36, 0.78);
-      border-radius: 22px;
+    .topbar {
+      max-width: 1220px;
+      margin: 0 auto;
       padding: 1rem;
-    }
-
-    .app-signal-value {
-      font-family: "Rajdhani", sans-serif;
-      font-size: 1.9rem;
-      line-height: 1;
-      margin-top: 0.65rem;
-    }
-
-    .app-meter {
-      width: 100%;
-      height: 0.55rem;
-      border-radius: 999px;
-      background: rgba(120, 181, 255, 0.08);
-      overflow: hidden;
-    }
-
-    .app-meter-fill {
-      height: 100%;
-      border-radius: inherit;
-      background: linear-gradient(90deg, rgba(57, 198, 244, 0.58), rgba(151, 237, 255, 1));
-      box-shadow: 0 0 18px rgba(57, 198, 244, 0.35);
-    }
-
-    .app-meter-fill-success {
-      background: linear-gradient(90deg, rgba(34, 197, 94, 0.5), rgba(74, 222, 128, 1));
-      box-shadow: 0 0 18px rgba(74, 222, 128, 0.28);
-    }
-
-    .app-meter-fill-danger {
-      background: linear-gradient(90deg, rgba(251, 113, 133, 0.4), rgba(251, 113, 133, 1));
-      box-shadow: 0 0 18px rgba(251, 113, 133, 0.28);
-    }
-
-    .app-trend-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .app-trend-card {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      border-radius: 22px;
-      background: rgba(7, 18, 32, 0.84);
-      padding: 1rem;
-    }
-
-    .app-trend-bars {
-      margin-top: 0.85rem;
       display: flex;
-      align-items: end;
-      gap: 0.45rem;
-      min-height: 84px;
+      justify-content: space-between;
+      gap: 0.8rem;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
-    .app-trend-bar {
-      flex: 1 1 0;
-      border-radius: 999px 999px 0 0;
-      background: linear-gradient(180deg, rgba(57, 198, 244, 0.95), rgba(57, 198, 244, 0.18));
-      min-height: 12px;
-    }
+    .brand { display: grid; gap: 0.2rem; }
 
-    .app-filter-shell {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      background: rgba(7, 18, 32, 0.9);
-      border-radius: 24px;
-      padding: 1rem;
-    }
-
-    .app-summary-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .app-summary-card {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      background: rgba(10, 24, 43, 0.82);
-      border-radius: 22px;
-      padding: 1rem;
-    }
-
-    .app-summary-value {
+    .brand a {
+      text-decoration: none;
+      color: var(--ink);
       font-family: "Rajdhani", sans-serif;
-      font-size: 2rem;
-      line-height: 1;
-      margin-top: 0.55rem;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
     }
 
-    .app-table-wrap {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      border-radius: 24px;
-      background: rgba(7, 18, 32, 0.76);
-      overflow: hidden;
+    .eyebrow {
+      font-family: "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      color: #7ebaf6;
     }
 
-    .app-signal-dot {
-      width: 0.6rem;
-      height: 0.6rem;
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 0.46rem;
+      flex-wrap: wrap;
+    }
+
+    .nav a, .nav button {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      text-decoration: none;
+      background: rgba(10, 26, 46, 0.78);
       border-radius: 999px;
-      display: inline-block;
-      box-shadow: 0 0 12px currentColor;
+      padding: 0.52rem 0.9rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: 140ms ease;
+      font: inherit;
     }
 
-    .app-link-muted {
-      color: var(--app-muted);
+    .nav a:hover, .nav button:hover {
+      border-color: var(--line-strong);
+      background: rgba(14, 34, 58, 0.94);
+    }
+
+    .lang-group {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.15rem;
+      display: inline-flex;
+      gap: 0.15rem;
+      background: rgba(10,26,46,0.78);
+    }
+
+    .lang-group a {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.34rem 0.68rem;
+      color: var(--muted);
+      font-size: 0.74rem;
       text-decoration: none;
     }
 
-    .app-link-muted:hover {
-      color: var(--app-accent-deep);
-    }
-
-    .app-section-title {
-      font-family: "Rajdhani", sans-serif;
-      letter-spacing: 0.03em;
-    }
-
-    .app-crumbs {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.6rem;
-      color: var(--app-muted);
-      font-size: 0.86rem;
-    }
-
-    .app-crumbs-sep {
-      color: rgba(144, 168, 199, 0.55);
-    }
-
-    .app-meta-grid {
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .app-meta-card {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      background: rgba(7, 18, 32, 0.84);
-      border-radius: 22px;
-      padding: 1rem;
-    }
-
-    .app-meta-value {
-      margin-top: 0.55rem;
-      color: white;
+    .lang-group a.active {
+      background: var(--accent);
+      color: #03233b;
       font-weight: 600;
     }
 
-    .app-terminal-frame {
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      border-radius: 24px;
-      background: linear-gradient(180deg, rgba(5, 12, 22, 0.98), rgba(3, 9, 18, 0.98));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-      overflow: hidden;
-    }
-
-    .app-terminal-topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.9rem 1.1rem;
-      border-bottom: 1px solid rgba(120, 181, 255, 0.12);
-      background: rgba(8, 19, 34, 0.92);
-    }
-
-    .app-terminal-dots {
+    .tag {
       display: inline-flex;
+      align-items: center;
       gap: 0.4rem;
-      align-items: center;
-    }
-
-    .app-terminal-dot {
-      width: 0.72rem;
-      height: 0.72rem;
+      border: 1px solid rgba(57,198,244,0.26);
       border-radius: 999px;
-      display: inline-block;
+      padding: 0.35rem 0.68rem;
+      color: var(--accent-deep);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(57,198,244,0.1);
     }
 
-    .app-terminal-body {
-      padding: 1.4rem;
-      color: #d6ecff;
-      background:
-        linear-gradient(180deg, rgba(7, 18, 32, 0.9), rgba(4, 10, 18, 1)),
-        rgba(4, 10, 18, 1);
+    main {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 1.2rem 1rem 2rem;
     }
 
-    .app-status-chip {
+    app-panel {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+
+    app-panel[strong] {
+      background: var(--panel-strong);
+    }
+
+    app-kicker {
       display: inline-flex;
       align-items: center;
-      gap: 0.45rem;
-      padding: 0.45rem 0.7rem;
+      border: 1px solid rgba(57,198,244,0.2);
       border-radius: 999px;
-      border: 1px solid rgba(120, 181, 255, 0.14);
-      background: rgba(12, 31, 55, 0.82);
-      font-size: 0.8rem;
-      color: white;
+      color: var(--accent-deep);
+      padding: 0.42rem 0.72rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(57,198,244,0.1);
     }
 
-    .app-status-chip-dot {
-      width: 0.5rem;
-      height: 0.5rem;
+    metric-tile {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(8, 23, 41, 0.9);
+      padding: 0.9rem;
+    }
+
+    .metric-label { color: var(--muted); font-size: 0.8rem; }
+    .metric-value {
+      margin-top: 0.45rem;
+      font-family: "Rajdhani", sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      border-radius: 999px;
+      padding: 0.55rem 0.95rem;
+      font-size: 0.84rem;
+      cursor: pointer;
+      font: inherit;
+      border: 1px solid transparent;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #042339;
+      border: 0;
+      font-weight: 700;
+    }
+
+    .btn-secondary {
+      background: rgba(10,26,46,0.78);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .btn-secondary:hover { border-color: var(--line-strong); }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.36rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.32rem 0.58rem;
+      font-size: 0.78rem;
+      background: rgba(12,31,55,0.82);
+    }
+
+    .dot {
+      width: 0.52rem;
+      height: 0.52rem;
       border-radius: 999px;
       display: inline-block;
-      box-shadow: 0 0 12px currentColor;
+      box-shadow: 0 0 10px currentColor;
     }
 
-    .app-side-stack {
+    .dot.success { color: var(--success); background: currentColor; }
+    .dot.warning { color: var(--warning); background: currentColor; }
+    .dot.danger { color: var(--danger); background: currentColor; }
+    .dot.info { color: var(--accent); background: currentColor; }
+
+    .field { display: grid; gap: 0.36rem; }
+    .field label { color: var(--muted); font-size: 0.8rem; }
+    .field input,
+    .field select,
+    .field textarea {
+      border: 1px solid var(--line);
+      background: rgba(7,19,34,0.92);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 0.56rem 0.72rem;
+      font: inherit;
+    }
+
+    .field textarea { min-height: 88px; resize: vertical; }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: rgba(57,198,244,0.56);
+      box-shadow: 0 0 0 4px rgba(57,198,244,0.12);
+    }
+
+    .mono { font-family: "IBM Plex Mono", monospace; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.72rem;
+      border-bottom: 1px solid rgba(120,181,255,0.1);
+      vertical-align: top;
+    }
+
+    th {
+      font-family: "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.72rem;
+      color: #8eb8df;
+    }
+
+    tr:hover td { background: rgba(57,198,244,0.05); }
+
+    .grid-2 { display: grid; gap: 1rem; grid-template-columns: 1.1fr 0.9fr; }
+    .grid-3 { display: grid; gap: 1rem; grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { display: grid; gap: 1rem; grid-template-columns: repeat(4, 1fr); }
+
+    .muted { color: var(--muted); }
+    .title {
+      font-family: "Rajdhani", sans-serif;
+      letter-spacing: 0.03em;
+      margin: 0;
+    }
+
+    .section-head { padding: 1rem 1rem 0.2rem; }
+    .section-body { padding: 1rem; }
+
+    .login-wrap {
+      min-height: 100vh;
       display: grid;
-      gap: 1rem;
+      place-items: center;
+      padding: 1rem;
+    }
+
+    .login-card {
+      width: min(430px, 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+
+    .error-box {
+      border: 1px solid rgba(251,113,133,0.45);
+      border-radius: 10px;
+      padding: 0.5rem 0.7rem;
+      color: #ffd8df;
+      background: rgba(251,113,133,0.12);
+      margin-bottom: 0.8rem;
+      font-size: 0.83rem;
     }
 
     @media (max-width: 1024px) {
-      .app-signal-band,
-      .app-summary-grid,
-      .app-trend-grid,
-      .app-meta-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
     }
 
-    @media (max-width: 640px) {
-      .app-signal-band,
-      .app-summary-grid,
-      .app-trend-grid,
-      .app-meta-grid {
-        grid-template-columns: minmax(0, 1fr);
-      }
+    @media (max-width: 680px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .topbar { padding: 0.8rem; }
+      main { padding: 1rem 0.8rem 1.4rem; }
+      .brand a { font-size: 1.38rem; }
     }
   </style>
+  <script>
+    class AppShell extends HTMLElement {}
+    class AppPanel extends HTMLElement {}
+    class AppKicker extends HTMLElement {}
+    class MetricTile extends HTMLElement {}
+    class StatusPill extends HTMLElement {}
+    customElements.define('app-shell', AppShell);
+    customElements.define('app-panel', AppPanel);
+    customElements.define('app-kicker', AppKicker);
+    customElements.define('metric-tile', MetricTile);
+    customElements.define('status-pill', StatusPill);
+  </script>
 </head>
-<body class="app-shell">
-  <div class="app-chrome">
-    <div class="app-nav">
-      <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 md:px-6">
-        <div class="min-w-0">
-          <div class="mb-2 flex flex-wrap items-center gap-2">
-            <div class="app-brand-badge">{{ tr .Dict "brand_direction_value" }}</div>
-            <div class="app-eyebrow">{{ tr .Dict "app_subtitle" }}</div>
-          </div>
-          <a class="app-title block text-2xl font-bold tracking-tight md:text-3xl" href="{{ withLang "/" .Lang }}">{{ tr .Dict "app_title" }}</a>
+<body>
+  <app-shell>
+    {{ if not .HideNav }}
+    <div class="topbar-wrap">
+      <div class="topbar">
+        <div class="brand">
+          <div class="eyebrow">{{ tr .Dict "app_subtitle" }}</div>
+          <a href="{{ withLang "/" .Lang }}">{{ tr .Dict "app_title" }}</a>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <a class="btn btn-sm rounded-full border border-[color:var(--app-border)] bg-[rgba(10,26,46,0.76)] px-4 text-[0.82rem] font-medium text-[color:var(--app-ink)] shadow-none hover:border-[color:var(--app-border-strong)] hover:bg-[rgba(14,34,58,0.94)]" href="{{ withLang "/" .Lang }}">{{ tr .Dict "nav_dashboard" }}</a>
-          <a class="btn btn-sm rounded-full border border-[color:var(--app-border)] bg-[rgba(10,26,46,0.76)] px-4 text-[0.82rem] font-medium text-[color:var(--app-ink)] shadow-none hover:border-[color:var(--app-border-strong)] hover:bg-[rgba(14,34,58,0.94)]" href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "nav_jobs" }}</a>
-          <a class="btn btn-sm rounded-full border-0 bg-[color:var(--app-accent-soft)] px-4 text-[0.82rem] font-medium text-[color:var(--app-accent-deep)] shadow-none hover:bg-[rgba(57,198,244,0.2)]" href="/api/v1/healthz">{{ tr .Dict "nav_health" }}</a>
-          <div class="ml-1 flex items-center rounded-full border border-[color:var(--app-border)] bg-[rgba(10,26,46,0.76)] p-1">
-            <a class="btn btn-xs rounded-full border-0 px-3 shadow-none {{ if eq .Lang "zh" }}bg-[color:var(--app-accent)] text-white hover:bg-[color:var(--app-accent)]{{ else }}bg-transparent text-[color:var(--app-muted)] hover:bg-white{{ end }}" href="{{ switchLang .CurrentPath .CurrentQuery "zh" }}">{{ tr .Dict "lang_zh" }}</a>
-            <a class="btn btn-xs rounded-full border-0 px-3 shadow-none {{ if eq .Lang "en" }}bg-[color:var(--app-accent)] text-white hover:bg-[color:var(--app-accent)]{{ else }}bg-transparent text-[color:var(--app-muted)] hover:bg-white{{ end }}" href="{{ switchLang .CurrentPath .CurrentQuery "en" }}">{{ tr .Dict "lang_en" }}</a>
-          </div>
+        <div class="nav">
+          <a href="{{ withLang "/" .Lang }}">{{ tr .Dict "nav_dashboard" }}</a>
+          <a href="{{ withLang "/jobs" .Lang }}">{{ tr .Dict "nav_jobs" }}</a>
+          <a href="/api/v1/healthz">{{ tr .Dict "nav_health" }}</a>
+          <span class="tag">{{ tr .Dict "brand_direction_value" }}</span>
+          <span class="lang-group">
+            <a class="{{ if eq .Lang "zh" }}active{{ end }}" href="{{ switchLang .CurrentPath .CurrentQuery "zh" }}">{{ tr .Dict "lang_zh" }}</a>
+            <a class="{{ if eq .Lang "en" }}active{{ end }}" href="{{ switchLang .CurrentPath .CurrentQuery "en" }}">{{ tr .Dict "lang_en" }}</a>
+          </span>
+          {{ if .AuthUser }}
+          <span class="tag">{{ .AuthUser }}</span>
+          <form method="post" action="{{ withLang "/logout" .Lang }}">
+            <button type="submit">{{ tr .Dict "nav_logout" }}</button>
+          </form>
+          {{ end }}
         </div>
       </div>
     </div>
-    <main class="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
+    {{ end }}
+    <main>
 {{ end }}
 
 {{ define "footer" }}
     </main>
-  </div>
+  </app-shell>
 </body>
 </html>
 {{ end }}

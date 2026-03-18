@@ -3,6 +3,7 @@ package handler
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,6 +22,7 @@ type PageHandler struct {
 	service   *jobapp.Service
 	logs      logrepo.Repository
 	runs      jobrunrepo.Repository
+	auth      *authService
 	templates *template.Template
 }
 
@@ -29,8 +31,100 @@ func NewPageHandler(service *jobapp.Service, runs jobrunrepo.Repository, logs lo
 		service:   service,
 		logs:      logs,
 		runs:      runs,
+		auth:      newAuthService(),
 		templates: mustParseTemplates(),
 	}
+}
+
+func (h *PageHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := h.currentUser(r); ok {
+			next(w, r)
+			return
+		}
+		nextURL := r.URL.Path
+		if r.URL.RawQuery != "" {
+			nextURL += "?" + r.URL.RawQuery
+		}
+		lang := currentLang(r)
+		loginURL := "/login?next=" + url.QueryEscape(nextURL) + "&lang=" + url.QueryEscape(lang)
+		http.Redirect(w, r, loginURL, http.StatusFound)
+	}
+}
+
+func (h *PageHandler) Login(w http.ResponseWriter, r *http.Request) {
+	lang := currentLang(r)
+	dict := dictionary(lang)
+	if _, ok := h.currentUser(r); ok && r.Method == http.MethodGet {
+		http.Redirect(w, r, appendLang("/", lang), http.StatusSeeOther)
+		return
+	}
+
+	next := safeNext(r.URL.Query().Get("next"))
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		next = safeNext(r.FormValue("next"))
+		username := strings.TrimSpace(r.FormValue("username"))
+		password := r.FormValue("password")
+		token, ok := h.auth.authenticate(username, password)
+		if !ok {
+			data := map[string]any{
+				"Title":        tr(dict, "login_title", "Login"),
+				"HideNav":      true,
+				"Error":        tr(dict, "login_error_invalid", "Invalid credentials"),
+				"Next":         next,
+				"DefaultUser":  os.Getenv("ADMIN_USER"),
+				"DefaultPass":  os.Getenv("ADMIN_PASSWORD"),
+				"CurrentPath":  r.URL.Path,
+				"CurrentQuery": r.URL.RawQuery,
+			}
+			h.render(w, r, "login", data)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:     authCookieName,
+			Value:    token,
+			Path:     "/",
+			MaxAge:   int(h.auth.ttl.Seconds()),
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
+		http.Redirect(w, r, appendLang(next, lang), http.StatusSeeOther)
+		return
+	}
+
+	data := map[string]any{
+		"Title":        tr(dict, "login_title", "Login"),
+		"HideNav":      true,
+		"Next":         next,
+		"DefaultUser":  os.Getenv("ADMIN_USER"),
+		"DefaultPass":  os.Getenv("ADMIN_PASSWORD"),
+		"CurrentPath":  r.URL.Path,
+		"CurrentQuery": r.URL.RawQuery,
+	}
+	h.render(w, r, "login", data)
+}
+
+func (h *PageHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if cookie, err := r.Cookie(authCookieName); err == nil {
+		h.auth.removeSession(cookie.Value)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, appendLang("/login", currentLang(r)), http.StatusSeeOther)
 }
 
 func (h *PageHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
@@ -165,6 +259,9 @@ func (h *PageHandler) JobRoutes(w http.ResponseWriter, r *http.Request) {
 func (h *PageHandler) render(w http.ResponseWriter, r *http.Request, name string, data map[string]any) {
 	lang := resolveLang(w, r)
 	dict := dictionary(lang)
+	if user, ok := h.currentUser(r); ok {
+		data["AuthUser"] = user
+	}
 	data["Lang"] = lang
 	data["Dict"] = dict
 	data["CurrentPath"] = r.URL.Path
@@ -182,6 +279,7 @@ func mustParseTemplates() *template.Template {
 	}
 	paths := []string{
 		filepath.Join(baseDir, "web/templates/layout/base.html"),
+		filepath.Join(baseDir, "web/templates/pages/login.html"),
 		filepath.Join(baseDir, "web/templates/pages/dashboard.html"),
 		filepath.Join(baseDir, "web/templates/pages/jobs.html"),
 		filepath.Join(baseDir, "web/templates/pages/job_detail.html"),
@@ -322,6 +420,33 @@ func defaultString(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func safeNext(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" || !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") {
+		return "/"
+	}
+	return target
+}
+
+func appendLang(path, lang string) string {
+	if lang == "" {
+		return path
+	}
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	return path + separator + "lang=" + url.QueryEscape(lang)
+}
+
+func (h *PageHandler) currentUser(r *http.Request) (string, bool) {
+	cookie, err := r.Cookie(authCookieName)
+	if err != nil {
+		return "", false
+	}
+	return h.auth.userByToken(cookie.Value)
 }
 
 func pct(part, total int) int {
