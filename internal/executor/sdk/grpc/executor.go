@@ -3,13 +3,14 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	"github.com/bobacgo/cron-job/internal/executor"
+	sdkprotocol "github.com/bobacgo/cron-job/internal/executor/sdk/protocol"
 	grpcpkg "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/encoding"
 )
 
 type Executor struct{}
@@ -22,61 +23,52 @@ func (e *Executor) Execute(ctx context.Context, req executor.Request) (executor.
 		ctx,
 		req.Job.Executor.SDK.URL,
 		grpcpkg.WithTransportCredentials(insecure.NewCredentials()),
-		grpcpkg.WithDefaultCallOptions(grpcpkg.ForceCodec(jsonCodec{})),
+		grpcpkg.WithDefaultCallOptions(grpcpkg.ForceCodec(sdkprotocol.JSONCodec{})),
 	)
 	if err != nil {
 		return executor.Result{Status: jobrundomain.StatusFailed, StartedAt: startedAt, FinishedAt: time.Now().UTC(), Message: err.Error()}, nil
 	}
 	defer conn.Close()
 
-	payload := map[string]any{
-		"job_id":       req.Job.ID,
-		"job_name":     req.Job.Name,
-		"run_id":       req.Run.ID,
-		"scheduled_at": req.Run.ScheduledAt,
+	request := sdkprotocol.RunRequest{
+		JobID:       req.Job.ID,
+		JobName:     req.Job.Name,
+		RunID:       req.Run.ID,
+		ScheduledAt: req.Run.ScheduledAt,
+		Attempt:     req.Run.Attempt,
+		TriggerType: req.Run.TriggerType,
 	}
-	response := map[string]any{}
+	response := sdkprotocol.RunResponse{}
 	method := req.Job.Executor.SDK.Method
 	if method == "" {
 		method = "/cronjob.v1.Executor/Run"
 	}
-	if err := conn.Invoke(ctx, method, payload, &response); err != nil {
+	if err := conn.Invoke(ctx, method, &request, &response); err != nil {
 		return executor.Result{Status: jobrundomain.StatusFailed, StartedAt: startedAt, FinishedAt: time.Now().UTC(), Message: err.Error()}, nil
 	}
 
-	outputBytes, err := json.Marshal(response)
-	if err != nil {
-		return executor.Result{}, err
+	output := response.Output
+	if output == "" {
+		outputBytes, err := json.Marshal(response)
+		if err != nil {
+			return executor.Result{}, err
+		}
+		output = string(outputBytes)
 	}
-	status := jobrundomain.StatusSucceeded
-	message := "sdk grpc request completed"
-	if raw, ok := response["status"].(string); ok && raw == "failed" {
-		status = jobrundomain.StatusFailed
-		message = "sdk grpc returned failed status"
+	status := sdkprotocol.NormalizeStatus(response.Status)
+	message := strings.TrimSpace(response.Message)
+	if message == "" {
+		message = "sdk grpc request completed"
 	}
 	return executor.Result{
 		Status:     status,
 		Message:    message,
-		Output:     string(outputBytes),
+		Output:     output,
 		StartedAt:  startedAt,
 		FinishedAt: time.Now().UTC(),
 	}, nil
 }
 
-type jsonCodec struct{}
-
-func (jsonCodec) Marshal(v any) ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func (jsonCodec) Unmarshal(data []byte, v any) error {
-	return json.Unmarshal(data, v)
-}
-
-func (jsonCodec) Name() string {
-	return "json"
-}
-
 func init() {
-	encoding.RegisterCodec(jsonCodec{})
+	sdkprotocol.RegisterJSONCodec()
 }

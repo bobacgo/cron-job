@@ -22,6 +22,7 @@ import (
 	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
 	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
 	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	sqliterepo "github.com/bobacgo/cron-job/internal/repository/sqlite"
 	schedulerloop "github.com/bobacgo/cron-job/internal/scheduler/loop"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 	adminhandler "github.com/bobacgo/cron-job/internal/transport/admin/handler"
@@ -32,9 +33,15 @@ import (
 func main() {
 	cfg := config.Load()
 
-	jobStore := jobrepo.NewInMemoryRepository()
-	jobRunStore := jobrunrepo.NewInMemoryRepository()
-	dependencyStore := dependencyrepo.NewInMemoryRepository()
+	db, err := sqliterepo.Open(cfg.DBPath)
+	if err != nil {
+		log.Fatalf("init sqlite: %v", err)
+	}
+	defer db.Close()
+
+	jobStore := jobrepo.NewSQLiteRepository(db)
+	jobRunStore := jobrunrepo.NewSQLiteRepository(db)
+	dependencyStore := dependencyrepo.NewSQLiteRepository(db)
 	runLogStore, err := logrepo.NewFileRepository(cfg.LogDir)
 	if err != nil {
 		log.Fatalf("init log repository: %v", err)

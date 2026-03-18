@@ -11,8 +11,9 @@
 - 手动触发
 - 暂停和恢复任务
 - 运行记录和状态跟踪
-- 运行日志文件落盘和详情查看
-- Go template + DaisyUI 后台页面
+- 运行日志分流落盘（stdout/stderr）和检索
+- Go template + Web Components 后台页面
+- 登录认证（会话 Cookie）
 
 ## 当前能力
 
@@ -22,10 +23,11 @@
 - `ScheduleLoop` 根据调度规则生成 `JobRun`
 - `DependencyLoop` 处理被依赖阻塞的任务
 - `RunLoop` 从 ready queue 取任务并调用执行器
-- 内存版 `Repository`、`Queue`、`Lease`
+- SQLite 版 `Repository`、内存版 `Queue`/`Lease`
 - 文件版任务日志存储
+- 日志流过滤和关键字检索
 - JSON API
-- 后台任务列表、创建表单、任务详情页、手动触发、暂停恢复、日志页
+- 后台任务列表、创建表单、任务详情页、手动触发、暂停恢复、日志页、登录/退出
 
 依赖语义目前是一个务实版实现：
 
@@ -68,6 +70,12 @@ go run ./cmd/server
 :8080
 ```
 
+可选：启动一个本地 gRPC SDK worker（用于 `sdk_protocol=grpc` 任务联调）：
+
+```bash
+go run ./cmd/sdk-worker -addr :50051
+```
+
 可通过环境变量覆盖：
 
 ```bash
@@ -78,6 +86,18 @@ HTTP_ADDR=:9090 go run ./cmd/server
 
 ```bash
 LOG_DIR=./tmp/logs go run ./cmd/server
+```
+
+SQLite 数据库路径也可覆盖：
+
+```bash
+DB_PATH=./data/cron-job.db go run ./cmd/server
+```
+
+后台登录账号也可通过环境变量覆盖：
+
+```bash
+ADMIN_USER=admin ADMIN_PASSWORD=admin123 go run ./cmd/server
 ```
 
 ## 已验证命令
@@ -207,8 +227,34 @@ POST /api/v1/jobs/{jobID}/resume
 GET /api/v1/job-runs/{runID}/logs
 ```
 
+可按流读取：
+
+```http
+GET /api/v1/job-runs/{runID}/logs?stream=stdout
+GET /api/v1/job-runs/{runID}/logs?stream=stderr
+```
+
+### 日志检索
+
+```http
+GET /api/v1/logs/search?q=timeout&stream=stderr&run_id={runID}&limit=100
+```
+
+### 取消运行
+
+```http
+POST /api/v1/job-runs/{runID}/cancel
+```
+
+### 重试运行
+
+```http
+POST /api/v1/job-runs/{runID}/retry
+```
+
 ## 后台页面
 
+- `/login`：登录页面
 - `/`：仪表盘
 - `/jobs`：任务列表 + 创建表单
 - `/jobs/{jobID}`：任务详情 + 最近运行记录 + 手动触发 + 暂停恢复
@@ -218,17 +264,16 @@ GET /api/v1/job-runs/{runID}/logs
 
 当前实现仍然是骨架阶段，下面这些能力还没有完成：
 
-- 持久化数据库存储
 - 更完整的重试和退避策略
 - 依赖图可视化页面
-- 登录认证和 RBAC
+- 更细粒度的 RBAC
 - 按调度窗口关联的依赖编排
 - 分布式 worker 和高可用调度
 
 ## 建议的下一步
 
-1. 把 `Repository` 从内存实现切到 SQLite 或 PostgreSQL。
-2. 补充更完整的日志分流和日志检索能力。
-3. 完成 Go SDK worker 侧协议，与 gRPC transport 配套。
-4. 补充取消、重试等后台动作。
-5. 增加单元测试，重点覆盖 `planner`、DAG 校验和依赖释放逻辑。
+1. 补充 PostgreSQL 仓储实现，并增加迁移版本管理。
+2. 为取消动作增加运行中任务的协作式中断能力。
+3. 完善 gRPC SDK 协议（proto 固化、版本协商、错误码语义）。
+4. 扩展测试覆盖到 dispatcher 重试链路与 API handler。
+5. 增加依赖图可视化和运维审计页。

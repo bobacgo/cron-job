@@ -133,6 +133,7 @@ func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRu
 		JobID:       job.ID,
 		ScheduledAt: now,
 		Status:      status,
+		Attempt:     1,
 		TriggerType: "manual",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -183,6 +184,89 @@ func (s *Service) ReadRunLog(ctx context.Context, runID string) (string, error) 
 	return s.logs.Read(ctx, runID)
 }
 
+func (s *Service) ReadRunLogStream(ctx context.Context, runID, stream string) (string, error) {
+	if strings.TrimSpace(stream) == "" {
+		return s.logs.Read(ctx, runID)
+	}
+	return s.logs.ReadStream(ctx, runID, stream)
+}
+
+func (s *Service) SearchRunLogs(ctx context.Context, query logrepo.Query) ([]logrepo.SearchItem, error) {
+	return s.logs.Search(ctx, query)
+}
+
+func (s *Service) CancelRun(ctx context.Context, runID string) (jobrundomain.JobRun, error) {
+	run, err := s.runs.Get(ctx, runID)
+	if err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	switch run.Status {
+	case jobrundomain.StatusSucceeded, jobrundomain.StatusFailed, jobrundomain.StatusTimedOut, jobrundomain.StatusSkipped, jobrundomain.StatusCanceled:
+		return jobrundomain.JobRun{}, fmt.Errorf("run %s is already finished", runID)
+	}
+	run.Status = jobrundomain.StatusCanceled
+	run.Message = "canceled by user"
+	now := time.Now().UTC()
+	if run.FinishedAt.IsZero() {
+		run.FinishedAt = now
+	}
+	run.UpdatedAt = now
+	if err := s.runs.Save(ctx, run); err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	_ = s.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: "run canceled by user", OccurredAt: now})
+	return run, nil
+}
+
+func (s *Service) RetryRun(ctx context.Context, runID string) (jobrundomain.JobRun, error) {
+	previous, err := s.runs.Get(ctx, runID)
+	if err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	switch previous.Status {
+	case jobrundomain.StatusFailed, jobrundomain.StatusTimedOut, jobrundomain.StatusCanceled:
+	default:
+		return jobrundomain.JobRun{}, fmt.Errorf("run %s status %s cannot be retried", runID, previous.Status)
+	}
+	job, err := s.jobs.Get(ctx, previous.JobID)
+	if err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	now := time.Now().UTC()
+	attempt := max(previous.Attempt, 1) + 1
+	trigger := "retry"
+	if previous.TriggerType != "" {
+		trigger = previous.TriggerType + ":retry"
+	}
+	run := jobrundomain.JobRun{
+		ID:          newID(),
+		JobID:       previous.JobID,
+		ScheduledAt: now,
+		Status:      jobrundomain.StatusReady,
+		Attempt:     attempt,
+		TriggerType: trigger,
+		Message:     "retry requested by user",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	// Keep the retry flow deterministic: only allow up to MaxRetries+1 attempts when configured.
+	if job.RetryPolicy.MaxRetries > 0 {
+		maxAttempt := job.RetryPolicy.MaxRetries + 1
+		if run.Attempt > maxAttempt {
+			return jobrundomain.JobRun{}, fmt.Errorf("retry limit reached for run %s", runID)
+		}
+	}
+
+	if err := s.runs.Save(ctx, run); err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	if err := s.queue.Enqueue(ctx, run.ID); err != nil {
+		return jobrundomain.JobRun{}, err
+	}
+	_ = s.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stdout", Content: "retry scheduled", OccurredAt: now})
+	return run, nil
+}
 func (s *Service) AppendRunLog(ctx context.Context, runID, stream, content string) error {
 	if strings.TrimSpace(content) == "" {
 		return nil

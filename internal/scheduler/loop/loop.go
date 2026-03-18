@@ -88,6 +88,7 @@ func (l *Loop) tick(ctx context.Context) {
 			JobID:       item.ID,
 			ScheduledAt: dueAt,
 			Status:      status,
+			Attempt:     1,
 			TriggerType: "schedule",
 			CreatedAt:   now,
 			UpdatedAt:   now,

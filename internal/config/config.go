@@ -5,6 +5,7 @@ import "os"
 type Config struct {
 	HTTPAddr string
 	LogDir   string
+	DBPath   string
 }
 
 func Load() Config {
@@ -16,6 +17,10 @@ func Load() Config {
 	if logDir == "" {
 		logDir = "data/logs"
 	}
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "data/cron-job.db"
+	}
 
-	return Config{HTTPAddr: addr, LogDir: logDir}
+	return Config{HTTPAddr: addr, LogDir: logDir, DBPath: dbPath}
 }
