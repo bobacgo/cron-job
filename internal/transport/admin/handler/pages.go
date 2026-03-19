@@ -288,7 +288,7 @@ func (h *PageHandler) Jobs(w http.ResponseWriter, r *http.Request) {
 	statusFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status")))
 	executorFilter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("executor")))
 	filteredJobs := filterJobs(jobs, query, statusFilter, executorFilter)
-	enabledCount, disabledCount, sdkCount, binaryCount := summarizeJobs(jobs)
+	enabledCount, disabledCount, sdkCount, binaryCount, shellCount := summarizeJobs(jobs)
 	data := map[string]any{
 		"Title":             tr(dict, "nav_jobs", "Jobs"),
 		"Jobs":              viewmodel.JobItems(filteredJobs),
@@ -302,6 +302,7 @@ func (h *PageHandler) Jobs(w http.ResponseWriter, r *http.Request) {
 		"DisabledCount":     disabledCount,
 		"SDKCount":          sdkCount,
 		"BinaryCount":       binaryCount,
+		"ShellCount":        shellCount,
 	}
 	h.render(w, r, "jobs", data)
 }
@@ -482,7 +483,8 @@ func (h *PageHandler) RunLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func buildExecutorSpec(r *http.Request) jobdomain.ExecutorSpec {
-	if r.FormValue("executor_type") == string(jobdomain.ExecutorKindBinary) {
+	switch r.FormValue("executor_type") {
+	case string(jobdomain.ExecutorKindBinary):
 		return jobdomain.ExecutorSpec{
 			Kind: jobdomain.ExecutorKindBinary,
 			Binary: &jobdomain.BinaryTarget{
@@ -491,15 +493,25 @@ func buildExecutorSpec(r *http.Request) jobdomain.ExecutorSpec {
 				Timeout: time.Duration(parseInt(r.FormValue("binary_timeout_seconds"))) * time.Second,
 			},
 		}
-	}
-	return jobdomain.ExecutorSpec{
-		Kind: jobdomain.ExecutorKindSDK,
-		SDK: &jobdomain.SDKTarget{
-			Protocol: defaultString(strings.TrimSpace(r.FormValue("sdk_protocol")), "http"),
-			URL:      strings.TrimSpace(r.FormValue("sdk_url")),
-			Method:   defaultString(strings.TrimSpace(r.FormValue("sdk_method")), http.MethodPost),
-			Timeout:  time.Duration(parseInt(r.FormValue("sdk_timeout_seconds"))) * time.Second,
-		},
+	case string(jobdomain.ExecutorKindShell):
+		return jobdomain.ExecutorSpec{
+			Kind: jobdomain.ExecutorKindShell,
+			Shell: &jobdomain.ShellTarget{
+				Script:  r.FormValue("shell_script"),
+				Shell:   defaultString(strings.TrimSpace(r.FormValue("shell_shell")), "/bin/sh"),
+				Timeout: time.Duration(parseInt(r.FormValue("shell_timeout_seconds"))) * time.Second,
+			},
+		}
+	default:
+		return jobdomain.ExecutorSpec{
+			Kind: jobdomain.ExecutorKindSDK,
+			SDK: &jobdomain.SDKTarget{
+				Protocol: defaultString(strings.TrimSpace(r.FormValue("sdk_protocol")), "http"),
+				URL:      strings.TrimSpace(r.FormValue("sdk_url")),
+				Method:   defaultString(strings.TrimSpace(r.FormValue("sdk_method")), http.MethodPost),
+				Timeout:  time.Duration(parseInt(r.FormValue("sdk_timeout_seconds"))) * time.Second,
+			},
+		}
 	}
 }
 
@@ -591,10 +603,7 @@ func filterJobs(jobs []jobdomain.Job, query, statusFilter, executorFilter string
 		}
 		if executorFilter != "" && executorFilter != "all" {
 			kind := strings.ToLower(string(item.Executor.Kind))
-			if executorFilter == "sdk" && kind != "sdk" {
-				continue
-			}
-			if executorFilter == "binary" && kind != "binary" {
+			if executorFilter != kind {
 				continue
 			}
 		}
@@ -603,7 +612,7 @@ func filterJobs(jobs []jobdomain.Job, query, statusFilter, executorFilter string
 	return filtered
 }
 
-func summarizeJobs(jobs []jobdomain.Job) (enabledCount, disabledCount, sdkCount, binaryCount int) {
+func summarizeJobs(jobs []jobdomain.Job) (enabledCount, disabledCount, sdkCount, binaryCount, shellCount int) {
 	for _, item := range jobs {
 		if item.Enabled {
 			enabledCount++
@@ -611,11 +620,15 @@ func summarizeJobs(jobs []jobdomain.Job) (enabledCount, disabledCount, sdkCount,
 			disabledCount++
 		}
 		switch item.Executor.Kind {
+		case jobdomain.ExecutorKindSDK:
+			sdkCount++
 		case jobdomain.ExecutorKindBinary:
 			binaryCount++
+		case jobdomain.ExecutorKindShell:
+			shellCount++
 		default:
 			sdkCount++
 		}
 	}
-	return enabledCount, disabledCount, sdkCount, binaryCount
+	return enabledCount, disabledCount, sdkCount, binaryCount, shellCount
 }

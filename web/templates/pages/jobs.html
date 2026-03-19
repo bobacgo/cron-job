@@ -13,7 +13,7 @@
   <metric-tile><div class="metric-label">{{ tr .Dict "visible_jobs" }}</div><div class="metric-value">{{ .VisibleJobs }}</div></metric-tile>
   <metric-tile><div class="metric-label">{{ tr .Dict "status_enabled" }}</div><div class="metric-value" style="color:var(--success);">{{ .EnabledCount }}</div></metric-tile>
   <metric-tile><div class="metric-label">{{ tr .Dict "status_disabled" }}</div><div class="metric-value" style="color:var(--warning);">{{ .DisabledCount }}</div></metric-tile>
-  <metric-tile><div class="metric-label">{{ tr .Dict "automation_mix" }}</div><div class="metric-value">{{ .SDKCount }}/{{ .BinaryCount }}</div></metric-tile>
+  <metric-tile><div class="metric-label">{{ tr .Dict "automation_mix" }}</div><div class="metric-value" style="font-size:1rem;line-height:1.4;">{{ tr .Dict "executor_sdk" }} {{ .SDKCount }} · {{ tr .Dict "executor_binary" }} {{ .BinaryCount }} · {{ tr .Dict "executor_shell" }} {{ .ShellCount }}</div></metric-tile>
 </div>
 
 <app-panel style="margin-top:1rem;">
@@ -40,8 +40,9 @@
         <label>{{ tr .Dict "filter_executor" }}</label>
         <select name="executor">
           <option value="" {{ if eq .FilterExecutor "" }}selected{{ end }}>{{ tr .Dict "executor_all" }}</option>
-          <option value="sdk" {{ if eq .FilterExecutor "sdk" }}selected{{ end }}>SDK</option>
-          <option value="binary" {{ if eq .FilterExecutor "binary" }}selected{{ end }}>Binary</option>
+          <option value="sdk" {{ if eq .FilterExecutor "sdk" }}selected{{ end }}>{{ tr .Dict "executor_sdk" }}</option>
+          <option value="binary" {{ if eq .FilterExecutor "binary" }}selected{{ end }}>{{ tr .Dict "executor_binary" }}</option>
+          <option value="shell" {{ if eq .FilterExecutor "shell" }}selected{{ end }}>{{ tr .Dict "executor_shell" }}</option>
         </select>
       </div>
       <div style="display:flex;gap:0.5rem;">
@@ -114,10 +115,10 @@
 
         <div class="grid-2">
           <div class="field"><label>{{ tr .Dict "field_time_zone" }}</label><input name="time_zone" value="UTC"></div>
-          <div class="field"><label>{{ tr .Dict "field_executor_type" }}</label><select name="executor_type"><option value="sdk">SDK</option><option value="binary">Binary</option></select></div>
+          <div class="field"><label>{{ tr .Dict "field_executor_type" }}</label><select name="executor_type"><option value="sdk">{{ tr .Dict "executor_sdk" }}</option><option value="binary">{{ tr .Dict "executor_binary" }}</option><option value="shell">{{ tr .Dict "executor_shell" }}</option></select></div>
         </div>
 
-        <app-panel>
+        <app-panel data-executor-panel="sdk">
           <div class="section-body" style="padding:0.8rem;display:grid;gap:0.7rem;">
             <div class="eyebrow">{{ tr .Dict "sdk_settings" }}</div>
             <div class="grid-2">
@@ -128,11 +129,22 @@
           </div>
         </app-panel>
 
-        <app-panel>
+        <app-panel data-executor-panel="binary">
           <div class="section-body" style="padding:0.8rem;display:grid;gap:0.7rem;">
             <div class="eyebrow">{{ tr .Dict "binary_settings" }}</div>
             <div class="field"><label>Command</label><input class="mono" name="binary_command" placeholder="/usr/local/bin/backup.sh"></div>
             <div class="field"><label>Args</label><textarea class="mono" name="binary_args" placeholder="--full,--target=/data"></textarea></div>
+          </div>
+        </app-panel>
+
+        <app-panel data-executor-panel="shell">
+          <div class="section-body" style="padding:0.8rem;display:grid;gap:0.7rem;">
+            <div class="eyebrow">{{ tr .Dict "shell_settings" }}</div>
+            <div class="field"><label>{{ tr .Dict "field_shell_script" }}</label><textarea class="mono" name="shell_script" placeholder="echo hello from shell"></textarea></div>
+            <div class="grid-2">
+              <div class="field"><label>{{ tr .Dict "field_shell_shell" }}</label><input class="mono" name="shell_shell" value="/bin/sh"></div>
+              <div class="field"><label>{{ tr .Dict "field_shell_timeout_seconds" }}</label><input type="number" min="0" name="shell_timeout_seconds" value="0"></div>
+            </div>
           </div>
         </app-panel>
 
@@ -160,6 +172,24 @@
     </div>
   </app-panel>
 </div>
+
+    <script>
+      (function () {
+        const executorSelect = document.querySelector('select[name="executor_type"]');
+        const panels = document.querySelectorAll('[data-executor-panel]');
+        if (!executorSelect || !panels.length) {
+          return;
+        }
+        const syncExecutorPanels = () => {
+          const active = executorSelect.value;
+          panels.forEach((panel) => {
+            panel.style.display = panel.getAttribute('data-executor-panel') === active ? 'block' : 'none';
+          });
+        };
+        executorSelect.addEventListener('change', syncExecutorPanels);
+        syncExecutorPanels();
+      })();
+    </script>
 
 {{ template "footer" . }}
 {{ end }}

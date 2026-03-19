@@ -45,7 +45,7 @@ func migrate(db *sql.DB) error {
 			binary_command TEXT NOT NULL,
 			binary_args_json LONGTEXT NOT NULL,
 			binary_timeout_seconds BIGINT NOT NULL,
-			shell_script LONGTEXT NOT NULL DEFAULT '',
+			shell_script LONGTEXT NOT NULL,
 			shell_shell VARCHAR(255) NOT NULL DEFAULT '',
 			shell_timeout_seconds BIGINT NOT NULL DEFAULT 0,
 			retry_max_retries INT NOT NULL,
@@ -87,6 +87,9 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
+	if err := ensureJobShellColumns(db); err != nil {
+		return err
+	}
 	if err := ensureIndex(db, "job_runs", "idx_job_runs_job_id", "job_id"); err != nil {
 		return err
 	}
@@ -112,3 +115,37 @@ WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
 	_, err := db.Exec(fmt.Sprintf("CREATE INDEX %s ON %s(%s)", indexName, table, column))
 	return err
 }
+
+func ensureJobShellColumns(db *sql.DB) error {
+	if err := ensureColumn(db, "jobs", "shell_script", `ALTER TABLE jobs ADD COLUMN shell_script LONGTEXT NULL`); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "jobs", "shell_shell", `ALTER TABLE jobs ADD COLUMN shell_shell VARCHAR(255) NOT NULL DEFAULT ''`); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "jobs", "shell_timeout_seconds", `ALTER TABLE jobs ADD COLUMN shell_timeout_seconds BIGINT NOT NULL DEFAULT 0`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`UPDATE jobs SET shell_script = '' WHERE shell_script IS NULL`); err != nil {
+		return err
+	}
+	_, err := db.Exec(`ALTER TABLE jobs MODIFY COLUMN shell_script LONGTEXT NOT NULL`)
+	return err
+}
+
+func ensureColumn(db *sql.DB, table, column, ddl string) error {
+	var cnt int
+	if err := db.QueryRow(`
+SELECT COUNT(1)
+FROM information_schema.columns
+WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
+`, table, column).Scan(&cnt); err != nil {
+		return err
+	}
+	if cnt > 0 {
+		return nil
+	}
+	_, err := db.Exec(ddl)
+	return err
+}
+
