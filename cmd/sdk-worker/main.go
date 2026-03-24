@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
-	"net"
 	"os"
 	"time"
 
 	sdkprotocol "github.com/bobacgo/cron-job/internal/executor/sdk/protocol"
+	"github.com/bobacgo/cron-job/kit/core"
 	grpcpkg "google.golang.org/grpc"
 )
 
@@ -50,15 +51,13 @@ func main() {
 
 	sdkprotocol.RegisterJSONCodec()
 
-	listener, err := net.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatalf("listen: %v", err)
-	}
-	server := grpcpkg.NewServer(grpcpkg.ForceServerCodec(sdkprotocol.JSONCodec{}))
-	registerExecutorService(server, workerServer{})
+	grpcServer := core.NewGRPCServer(*addr, grpcpkg.ForceServerCodec(sdkprotocol.JSONCodec{}))
+	server := core.NewServer(grpcServer)
+	server.SetShutdownTimeout(10 * time.Second)
+	registerExecutorService(grpcServer.Server(), workerServer{})
 
 	log.Printf("sdk worker listening on %s at %s", *addr, time.Now().UTC().Format(time.RFC3339))
-	if err := server.Serve(listener); err != nil {
+	if err := server.Run(); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, grpcpkg.ErrServerStopped) {
 		log.Fatalf("serve: %v", err)
 	}
 }

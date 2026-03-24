@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"log/slog"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
@@ -30,6 +29,8 @@ import (
 	adminhandler "github.com/bobacgo/cron-job/internal/transport/admin/handler"
 	httpapihandler "github.com/bobacgo/cron-job/internal/transport/httpapi/handler"
 	"github.com/bobacgo/cron-job/internal/transport/httpapi/router"
+	"github.com/bobacgo/cron-job/kit/core"
+	"github.com/bobacgo/cron-job/kit/slogx"
 )
 
 func main() {
@@ -68,39 +69,27 @@ func main() {
 	dependencyLoop := schedulerloop.NewDependency(dependencyStore, jobRunStore, readyQueue)
 	runLoop := dispatcherloop.New(jobStore, jobRunStore, runLogStore, readyQueue, leaseManager, runCancelManager, executorRegistry)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	_, cancel := context.WithCancel(context.Background())
+	loopSvc := core.NewBackgroundService(func(loopCtx context.Context) {
+		go scheduleLoop.Start(loopCtx, 5*time.Second)
+		go dependencyLoop.Start(loopCtx, 2*time.Second)
+		go runLoop.Start(loopCtx, 2*time.Second)
+	}, cancel)
 
-	go scheduleLoop.Start(ctx, 5*time.Second)
-	go dependencyLoop.Start(ctx, 2*time.Second)
-	go runLoop.Start(ctx, 2*time.Second)
+	httpServer := core.NewHTTPServer(cfg.HTTPAddr, router.New(apiHandler, adminPages), 5*time.Second)
+	server := core.NewServer(httpServer, loopSvc)
+	server.SetShutdownTimeout(10 * time.Second)
+	server.BeforeFunc(nil)        // 加载配置
+	server.BeforeFunc(initLogger) // 初始化日志
+	server.BeforeFunc(nil)        // 初始化数据库
 
-	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           router.New(apiHandler, adminPages),
-		ReadHeaderTimeout: 5 * time.Second,
+	slog.Info("cron service starting", "addr", cfg.HTTPAddr)
+	if err := server.Run(); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, http.ErrServerClosed) {
+		slogx.Fatal(context.Background(), "server failed", "error", err)
 	}
+}
 
-	shutdownDone := make(chan struct{})
-	go func() {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		<-sigCh
-
-		cancel()
-
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer shutdownCancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Printf("server shutdown error: %v", err)
-		}
-		close(shutdownDone)
-	}()
-
-	log.Printf("cron service listening on %s", cfg.HTTPAddr)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server failed: %v", err)
-	}
-
-	<-shutdownDone
+func initLogger(ctx context.Context) error {
+	slogx.Init()
+	return nil
 }
