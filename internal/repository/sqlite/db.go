@@ -4,19 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/bobacgo/cron-job/kit/database"
 )
 
 func Open(dsn string) (*sql.DB, error) {
-	if dsn == "" {
-		return nil, fmt.Errorf("mysql dsn is required")
-	}
-	db, err := sql.Open("mysql", dsn)
+	db, err := database.OpenMySQL(dsn, database.MySQLOptions{})
 	if err != nil {
-		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
 		return nil, err
 	}
 	if err := migrate(db); err != nil {
@@ -148,4 +141,3 @@ WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
 	_, err := db.Exec(ddl)
 	return err
 }
-
