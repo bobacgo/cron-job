@@ -52,8 +52,11 @@ func main() {
 	sdkprotocol.RegisterJSONCodec()
 
 	grpcServer := core.NewGRPCServer(*addr, grpcpkg.ForceServerCodec(sdkprotocol.JSONCodec{}))
-	server := core.NewServer(grpcServer)
+	server := core.NewServer[struct{}]()
 	server.SetShutdownTimeout(10 * time.Second)
+	server.Add(func(*struct{}) (core.Service, error) {
+		return grpcServer, nil
+	})
 	registerExecutorService(grpcServer.Server(), workerServer{})
 
 	log.Printf("sdk worker listening on %s at %s", *addr, time.Now().UTC().Format(time.RFC3339))

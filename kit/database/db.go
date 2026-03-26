@@ -3,50 +3,13 @@ package database
 import (
 	"database/sql"
 	"fmt"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
-const MySQLDriverName = "mysql"
-
-type MySQLOptions struct {
-	MaxOpenConn int
-	MaxIdleConn int
-}
-
-// OpenMySQL 打开 MySQL 数据库连接，并校验连通性。
-func OpenMySQL(dsn string, opts MySQLOptions) (*sql.DB, error) {
-	db, err := sql.Open(MySQLDriverName, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open mysql db err: %w", err)
-	}
-
-	if opts.MaxOpenConn > 0 {
-		db.SetMaxOpenConns(opts.MaxOpenConn)
-	}
-	if opts.MaxIdleConn > 0 {
-		db.SetMaxIdleConns(opts.MaxIdleConn)
-	}
-
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("ping mysql db err: %w", err)
-	}
-
-	return db, nil
-}
-
 // NewDB 新建数据库连接
-// 内部已自动 ping
-func NewDB(driver, source string, conf Config) (*sql.DB, error) {
-	db, err := sql.Open(driver, source)
+func NewDB(conf *Config) (*DB, error) {
+	db, err := sql.Open(conf.Driver, conf.Dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open db err: %w", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("ping db err: %w", err)
 	}
 
 	// 影响最大并发数。
@@ -63,5 +26,5 @@ func NewDB(driver, source string, conf Config) (*sql.DB, error) {
 	// 控制空闲连接的最长时间，防止长期空闲的连接占用资源。
 	// 典型值 10min，根据业务需求调整。
 	db.SetConnMaxIdleTime(conf.MaxIdleTime.TimeDuration()) // 空闲连接的最大生存时间
-	return db, nil
+	return &DB{DB: db}, nil
 }

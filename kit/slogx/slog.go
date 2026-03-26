@@ -88,7 +88,7 @@ func Fatal(ctx context.Context, msg string, args ...any) {
 
 // Init builds a slog Logger with colorized console output and source location,
 // sets it as the default logger, and returns it.
-func Init(opts ...Option) *slog.Logger {
+func Init(opts ...Option) {
 	cfg := &Config{
 		Level:      slog.LevelInfo,
 		Writer:     os.Stdout,
@@ -109,7 +109,6 @@ func Init(opts ...Option) *slog.Logger {
 
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
-	return logger
 }
 
 func newBaseHandler(cfg *Config) slog.Handler {

@@ -1,3 +1,14 @@
 http_addr: ":8080"
 log_dir: "data/logs"
-db_dsn: "root:@tcp(127.0.0.1:3306)/cron_job?charset=utf8mb4&parseTime=true&loc=Local"
+
+# 数据库多数据源配置
+database:
+  default:
+    driver: "mysql"
+    dsn: "root:@tcp(127.0.0.1:3306)/cron_job?charset=utf8mb4&parseTime=true&loc=Local"
+    slowThreshold: "200ms"
+    maxOpenConn: 100
+    maxIdleConn: 10
+    maxLifeTime: "1h"
+    maxIdleTime: "15m"
+

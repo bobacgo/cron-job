@@ -3,21 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
-
-	"github.com/bobacgo/cron-job/kit/database"
 )
-
-func Open(dsn string) (*sql.DB, error) {
-	db, err := database.OpenMySQL(dsn, database.MySQLOptions{})
-	if err != nil {
-		return nil, err
-	}
-	if err := migrate(db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return db, nil
-}
 
 func migrate(db *sql.DB) error {
 	statements := []string{

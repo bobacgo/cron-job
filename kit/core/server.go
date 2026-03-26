@@ -19,7 +19,9 @@ type Service interface {
 	Stop(ctx context.Context) error
 }
 
-type Server struct {
+type Server[T any] struct {
+	App *T
+
 	// 多个 service 组成一个 server，server 负责统一的生命周期管理。
 	svcs []Service
 	// beforeStartHooks 在所有 service 启动前执行，用于初始化配置、日志等依赖。
@@ -29,45 +31,41 @@ type Server struct {
 	shutdownTimeout time.Duration
 }
 
-func NewServer(svcs ...Service) *Server {
-	server := &Server{
+func NewServer[T any]() *Server[T] {
+	server := &Server[T]{
+		App:             new(T),
 		shutdownTimeout: defaultShutdownTimeout,
 		sigCh:           make(chan os.Signal, 1),
-	}
-	for _, svc := range svcs {
-		server.Add(svc)
 	}
 	return server
 }
 
+func (s *Server[T]) Init(initFunc func(*T) error) {
+	if initFunc != nil {
+		if err := initFunc(s.App); err != nil {
+			log.Fatalf("failed to initialize app: %v", err)
+		}
+	}
+}
+
 // Add 添加一个 Service 到 Server 中，Server 将负责管理该 Service 的生命周期。
-func (s *Server) Add(svc Service) {
-	if svc == nil {
+func (s *Server[T]) Add(svcFunc func(*T) (Service, error)) {
+	if svcFunc == nil {
 		return
+	}
+	svc, err := svcFunc(s.App)
+	if err != nil {
+		log.Fatalf("failed to create service: %v", err)
 	}
 	s.svcs = append(s.svcs, svc)
 }
 
-func (s *Server) SetShutdownTimeout(timeout time.Duration) {
+func (s *Server[T]) SetShutdownTimeout(timeout time.Duration) {
 	s.shutdownTimeout = timeout
 }
 
-// BeforeFunc 注册启动前钩子，按注册顺序执行。
-func (s *Server) BeforeFunc(hook func(context.Context) error) {
-	if hook == nil {
-		return
-	}
-	s.beforeStartHooks = append(s.beforeStartHooks, hook)
-}
-
 // Run 启动 Server 中的所有 Service，并监听系统信号以实现优雅停机。
-func (s *Server) Run() error {
-	for _, hook := range s.beforeStartHooks {
-		if err := hook(context.Background()); err != nil {
-			return fmt.Errorf("before start failed: %w", err)
-		}
-	}
-
+func (s *Server[T]) Run() error {
 	errCh := make(chan error, len(s.svcs))
 	for _, svc := range s.svcs {
 		currentSvc := svc
@@ -103,7 +101,7 @@ func (s *Server) Run() error {
 }
 
 // Stop 停止 Server 中的所有 Service，确保在指定的超时时间内完成优雅停机。
-func (s *Server) Stop() error {
+func (s *Server[T]) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 
