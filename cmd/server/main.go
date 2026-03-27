@@ -9,21 +9,16 @@ import (
 
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
 	"github.com/bobacgo/cron-job/internal/config"
-	dispatchercancel "github.com/bobacgo/cron-job/internal/dispatcher/cancel"
-	dispatcherlease "github.com/bobacgo/cron-job/internal/dispatcher/lease"
+	"github.com/bobacgo/cron-job/internal/dispatcher"
 	dispatcherloop "github.com/bobacgo/cron-job/internal/dispatcher/loop"
-	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	"github.com/bobacgo/cron-job/internal/executor"
 	binaryexec "github.com/bobacgo/cron-job/internal/executor/binary"
 	sdkgrpc "github.com/bobacgo/cron-job/internal/executor/sdk/grpc"
 	sdkhttp "github.com/bobacgo/cron-job/internal/executor/sdk/http"
 	shellexec "github.com/bobacgo/cron-job/internal/executor/shell"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	"github.com/bobacgo/cron-job/internal/repository"
+	"github.com/bobacgo/cron-job/internal/scheduler"
 	schedulerloop "github.com/bobacgo/cron-job/internal/scheduler/loop"
-	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 	adminhandler "github.com/bobacgo/cron-job/internal/transport/admin/handler"
 	httpapihandler "github.com/bobacgo/cron-job/internal/transport/httpapi/handler"
 	"github.com/bobacgo/cron-job/internal/transport/httpapi/router"
@@ -108,18 +103,7 @@ func main() {
 // 对象容器
 func initBeans(app *App) error {
 	db := app.DB.Default().DB
-
-	jobStore := jobrepo.NewMySQLRepository(db)
-	jobRunStore := jobrunrepo.NewMySQLRepository(db)
-	dependencyStore := dependencyrepo.NewMySQLRepository(db)
-	runLogStore, err := logrepo.NewFileRepository(app.Cfg.LogDir)
-	if err != nil {
-		return err
-	}
-	readyQueue := queue.NewInMemoryQueue()
-	leaseManager := dispatcherlease.NewMemoryManager(30 * time.Second)
-	runCancelManager := dispatchercancel.NewManager()
-	plannerSvc := planner.New()
+	repo := repository.NewRepo(app.Cfg, db)
 
 	executorRegistry := executor.NewRegistry()
 	executorRegistry.Register("sdk-http", sdkhttp.NewExecutor(http.DefaultClient))
@@ -127,15 +111,17 @@ func initBeans(app *App) error {
 	executorRegistry.Register("binary", binaryexec.NewExecutor())
 	executorRegistry.Register("shell", shellexec.NewExecutor())
 
-	jobService := jobapp.NewService(jobStore, jobRunStore, dependencyStore, runLogStore, readyQueue, plannerSvc)
-	jobService.SetRunCanceler(runCancelManager)
+	dispcher := dispatcher.NewDispatcher(repo, executorRegistry)
+	schedulerSvc := scheduler.NewScheduler(repo, dispcher.ReadyQueue)
+
+	jobService := jobapp.NewService(repo, dispcher.ReadyQueue, schedulerSvc.Planner)
+	jobService.SetRunCanceler(dispcher.RunCancelManager)
 	app.Beans = &Beans{
 		APIHandler:     httpapihandler.NewJobHandler(jobService),
-		AdminPages:     adminhandler.NewPageHandler(jobService, jobRunStore, runLogStore),
-		ScheduleLoop:   schedulerloop.New(jobStore, jobRunStore, dependencyStore, readyQueue, plannerSvc),
-		DependencyLoop: schedulerloop.NewDependency(dependencyStore, jobRunStore, readyQueue),
-		RunLoop:        dispatcherloop.New(jobStore, jobRunStore, runLogStore, readyQueue, leaseManager, runCancelManager, executorRegistry),
+		AdminPages:     adminhandler.NewPageHandler(jobService, repo.JobRun, repo.Log),
+		ScheduleLoop:   schedulerloop.New(repo, dispcher.ReadyQueue, schedulerSvc.Planner),
+		DependencyLoop: schedulerloop.NewDependency(repo.Dependencies, repo.JobRun, dispcher.ReadyQueue),
+		RunLoop:        dispatcherloop.New(repo, dispcher.ReadyQueue, dispcher.LeaseManager, dispcher.RunCancelManager, executorRegistry),
 	}
-
 	return nil
 }

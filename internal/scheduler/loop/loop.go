@@ -9,6 +9,7 @@ import (
 
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
+	"github.com/bobacgo/cron-job/internal/repository"
 	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
 	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
 	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
@@ -23,8 +24,14 @@ type Loop struct {
 	planner *planner.Planner
 }
 
-func New(jobs jobrepo.Repository, runs jobrunrepo.Repository, deps dependencyrepo.Repository, queue queue.Queue, planner *planner.Planner) *Loop {
-	return &Loop{jobs: jobs, runs: runs, deps: deps, queue: queue, planner: planner}
+func New(repo *repository.Repo, queue queue.Queue, planner *planner.Planner) *Loop {
+	return &Loop{
+		jobs:    repo.Job,
+		runs:    repo.JobRun,
+		deps:    repo.Dependencies,
+		queue:   queue,
+		planner: planner,
+	}
 }
 
 func (l *Loop) Start(ctx context.Context, interval time.Duration) {

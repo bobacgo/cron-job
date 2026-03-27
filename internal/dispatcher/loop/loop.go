@@ -15,6 +15,7 @@ import (
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
 	"github.com/bobacgo/cron-job/internal/executor"
+	"github.com/bobacgo/cron-job/internal/repository"
 	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
 	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
 	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
@@ -30,11 +31,18 @@ type Loop struct {
 	executors *executor.Registry
 }
 
-func New(jobs jobrepo.Repository, runs jobrunrepo.Repository, logs logrepo.Repository, queue queue.Queue, leases dispatcherlease.Manager, cancels *dispatchercancel.Manager, executors *executor.Registry) *Loop {
+func New(repo *repository.Repo, queue queue.Queue, leases dispatcherlease.Manager, cancels *dispatchercancel.Manager, executors *executor.Registry) *Loop {
 	if cancels == nil {
 		cancels = dispatchercancel.NewManager()
 	}
-	return &Loop{jobs: jobs, runs: runs, logs: logs, queue: queue, leases: leases, cancels: cancels, executors: executors}
+	return &Loop{
+		jobs:      repo.Job,
+		runs:      repo.JobRun,
+		logs:      repo.Log,
+		queue:     queue,
+		leases:    leases,
+		cancels:   cancels,
+		executors: executors}
 }
 
 func (l *Loop) Start(ctx context.Context, interval time.Duration) {

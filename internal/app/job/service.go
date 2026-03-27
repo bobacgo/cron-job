@@ -14,21 +14,16 @@ import (
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
+	"github.com/bobacgo/cron-job/internal/repository"
 	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 )
 
 type Service struct {
-	jobs         jobrepo.Repository
-	runs         jobrunrepo.Repository
-	dependencies dependencyrepo.Repository
-	logs         logrepo.Repository
-	queue        queue.Queue
-	planner      *planner.Planner
-	runCanceler  interface{ Cancel(runID string) bool }
+	repo        *repository.Repo
+	queue       queue.Queue
+	planner     *planner.Planner
+	runCanceler interface{ Cancel(runID string) bool }
 }
 
 type Detail struct {
@@ -38,8 +33,8 @@ type Detail struct {
 	Runs           []jobrundomain.JobRun
 }
 
-func NewService(jobs jobrepo.Repository, runs jobrunrepo.Repository, dependencies dependencyrepo.Repository, logs logrepo.Repository, queue queue.Queue, planner *planner.Planner) *Service {
-	return &Service{jobs: jobs, runs: runs, dependencies: dependencies, logs: logs, queue: queue, planner: planner}
+func NewService(repo *repository.Repo, queue queue.Queue, planner *planner.Planner) *Service {
+	return &Service{repo: repo, queue: queue, planner: planner}
 }
 
 func (s *Service) SetRunCanceler(canceler interface{ Cancel(runID string) bool }) {
@@ -68,14 +63,14 @@ func (s *Service) Create(ctx context.Context, job jobdomain.Job, dependencyIDs [
 		return jobdomain.Job{}, err
 	}
 
-	if err := s.jobs.Save(ctx, job); err != nil {
+	if err := s.repo.Job.Save(ctx, job); err != nil {
 		return jobdomain.Job{}, err
 	}
 	if len(edges) > 0 {
 		for i := range edges {
 			edges[i].JobID = job.ID
 		}
-		if err := s.dependencies.Replace(ctx, job.ID, edges); err != nil {
+		if err := s.repo.Dependencies.Replace(ctx, job.ID, edges); err != nil {
 			return jobdomain.Job{}, err
 		}
 	}
@@ -84,30 +79,30 @@ func (s *Service) Create(ctx context.Context, job jobdomain.Job, dependencyIDs [
 }
 
 func (s *Service) List(ctx context.Context) ([]jobdomain.Job, error) {
-	return s.jobs.List(ctx)
+	return s.repo.Job.List(ctx)
 }
 
 func (s *Service) Get(ctx context.Context, id string) (jobdomain.Job, error) {
-	return s.jobs.Get(ctx, id)
+	return s.repo.Job.Get(ctx, id)
 }
 
 func (s *Service) GetDetail(ctx context.Context, id string) (Detail, error) {
-	job, err := s.jobs.Get(ctx, id)
+	job, err := s.repo.Job.Get(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
-	edges, err := s.dependencies.ListByJob(ctx, id)
+	edges, err := s.repo.Dependencies.ListByJob(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
-	runs, err := s.runs.ListByJob(ctx, id)
+	runs, err := s.repo.JobRun.ListByJob(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
 
 	depJobs := make([]jobdomain.Job, 0, len(edges))
 	for _, edge := range edges {
-		depJob, err := s.jobs.Get(ctx, edge.DependsOnJobID)
+		depJob, err := s.repo.Job.Get(ctx, edge.DependsOnJobID)
 		if err == nil {
 			depJobs = append(depJobs, depJob)
 		}
@@ -117,7 +112,7 @@ func (s *Service) GetDetail(ctx context.Context, id string) (Detail, error) {
 }
 
 func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRun, error) {
-	job, err := s.jobs.Get(ctx, jobID)
+	job, err := s.repo.Job.Get(ctx, jobID)
 	if err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -126,7 +121,7 @@ func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRu
 	}
 	now := time.Now().UTC()
 	status := jobrundomain.StatusReady
-	edges, err := s.dependencies.ListByJob(ctx, jobID)
+	edges, err := s.repo.Dependencies.ListByJob(ctx, jobID)
 	if err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -143,7 +138,7 @@ func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRu
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := s.runs.Save(ctx, run); err != nil {
+	if err := s.repo.JobRun.Save(ctx, run); err != nil {
 		return jobrundomain.JobRun{}, err
 	}
 	if status == jobrundomain.StatusReady {
@@ -155,20 +150,20 @@ func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRu
 }
 
 func (s *Service) Pause(ctx context.Context, jobID string) (jobdomain.Job, error) {
-	job, err := s.jobs.Get(ctx, jobID)
+	job, err := s.repo.Job.Get(ctx, jobID)
 	if err != nil {
 		return jobdomain.Job{}, err
 	}
 	job.Enabled = false
 	job.UpdatedAt = time.Now().UTC()
-	if err := s.jobs.Save(ctx, job); err != nil {
+	if err := s.repo.Job.Save(ctx, job); err != nil {
 		return jobdomain.Job{}, err
 	}
 	return job, nil
 }
 
 func (s *Service) Resume(ctx context.Context, jobID string) (jobdomain.Job, error) {
-	job, err := s.jobs.Get(ctx, jobID)
+	job, err := s.repo.Job.Get(ctx, jobID)
 	if err != nil {
 		return jobdomain.Job{}, err
 	}
@@ -179,29 +174,29 @@ func (s *Service) Resume(ctx context.Context, jobID string) (jobdomain.Job, erro
 	}
 	job.NextRunAt = nextRunAt
 	job.UpdatedAt = time.Now().UTC()
-	if err := s.jobs.Save(ctx, job); err != nil {
+	if err := s.repo.Job.Save(ctx, job); err != nil {
 		return jobdomain.Job{}, err
 	}
 	return job, nil
 }
 
 func (s *Service) ReadRunLog(ctx context.Context, runID string) (string, error) {
-	return s.logs.Read(ctx, runID)
+	return s.repo.Log.Read(ctx, runID)
 }
 
 func (s *Service) ReadRunLogStream(ctx context.Context, runID, stream string) (string, error) {
 	if strings.TrimSpace(stream) == "" {
-		return s.logs.Read(ctx, runID)
+		return s.repo.Log.Read(ctx, runID)
 	}
-	return s.logs.ReadStream(ctx, runID, stream)
+	return s.repo.Log.ReadStream(ctx, runID, stream)
 }
 
 func (s *Service) SearchRunLogs(ctx context.Context, query logrepo.Query) ([]logrepo.SearchItem, error) {
-	return s.logs.Search(ctx, query)
+	return s.repo.Log.Search(ctx, query)
 }
 
 func (s *Service) CancelRun(ctx context.Context, runID string) (jobrundomain.JobRun, error) {
-	run, err := s.runs.Get(ctx, runID)
+	run, err := s.repo.JobRun.Get(ctx, runID)
 	if err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -219,15 +214,15 @@ func (s *Service) CancelRun(ctx context.Context, runID string) (jobrundomain.Job
 		run.FinishedAt = now
 	}
 	run.UpdatedAt = now
-	if err := s.runs.Save(ctx, run); err != nil {
+	if err := s.repo.JobRun.Save(ctx, run); err != nil {
 		return jobrundomain.JobRun{}, err
 	}
-	_ = s.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: "run canceled by user", OccurredAt: now})
+	_ = s.repo.Log.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: "run canceled by user", OccurredAt: now})
 	return run, nil
 }
 
 func (s *Service) RetryRun(ctx context.Context, runID string) (jobrundomain.JobRun, error) {
-	previous, err := s.runs.Get(ctx, runID)
+	previous, err := s.repo.JobRun.Get(ctx, runID)
 	if err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -236,7 +231,7 @@ func (s *Service) RetryRun(ctx context.Context, runID string) (jobrundomain.JobR
 	default:
 		return jobrundomain.JobRun{}, fmt.Errorf("run %s status %s cannot be retried", runID, previous.Status)
 	}
-	job, err := s.jobs.Get(ctx, previous.JobID)
+	job, err := s.repo.Job.Get(ctx, previous.JobID)
 	if err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -266,20 +261,20 @@ func (s *Service) RetryRun(ctx context.Context, runID string) (jobrundomain.JobR
 		}
 	}
 
-	if err := s.runs.Save(ctx, run); err != nil {
+	if err := s.repo.JobRun.Save(ctx, run); err != nil {
 		return jobrundomain.JobRun{}, err
 	}
 	if err := s.queue.Enqueue(ctx, run.ID); err != nil {
 		return jobrundomain.JobRun{}, err
 	}
-	_ = s.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stdout", Content: "retry scheduled", OccurredAt: now})
+	_ = s.repo.Log.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stdout", Content: "retry scheduled", OccurredAt: now})
 	return run, nil
 }
 func (s *Service) AppendRunLog(ctx context.Context, runID, stream, content string) error {
 	if strings.TrimSpace(content) == "" {
 		return nil
 	}
-	return s.logs.Append(ctx, runlog.LogRecord{
+	return s.repo.Log.Append(ctx, runlog.LogRecord{
 		RunID:      runID,
 		Stream:     stream,
 		Content:    content,
@@ -291,7 +286,7 @@ func (s *Service) buildEdges(ctx context.Context, jobID string, dependencyIDs []
 	if len(dependencyIDs) == 0 {
 		return nil, nil
 	}
-	allJobs, err := s.jobs.List(ctx)
+	allJobs, err := s.repo.Job.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +316,7 @@ func (s *Service) buildEdges(ctx context.Context, jobID string, dependencyIDs []
 		edges = append(edges, dependencydomain.Edge{JobID: jobID, DependsOnJobID: depID})
 	}
 
-	existingEdges, err := s.dependencies.ListAll(ctx)
+	existingEdges, err := s.repo.Dependencies.ListAll(ctx)
 	if err != nil {
 		return nil, err
 	}
