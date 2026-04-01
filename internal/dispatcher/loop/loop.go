@@ -16,15 +16,12 @@ import (
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
 	"github.com/bobacgo/cron-job/internal/executor"
 	"github.com/bobacgo/cron-job/internal/repository"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
 )
 
 type Loop struct {
-	jobs      jobrepo.Repository
-	runs      jobrunrepo.Repository
-	logs      logrepo.Repository
+	jobs      repository.JobRepository
+	runs      repository.JobRunRepository
+	logs      repository.LogRepository
 	queue     queue.Queue
 	leases    dispatcherlease.Manager
 	cancels   *dispatchercancel.Manager

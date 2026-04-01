@@ -7,17 +7,16 @@ import (
 
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
+	"github.com/bobacgo/cron-job/internal/repository"
 )
 
 type DependencyLoop struct {
-	dependencies dependencyrepo.Repository
-	runs         jobrunrepo.Repository
+	dependencies repository.DependencyRepository
+	runs         repository.JobRunRepository
 	queue        queue.Queue
 }
 
-func NewDependency(dependencies dependencyrepo.Repository, runs jobrunrepo.Repository, queue queue.Queue) *DependencyLoop {
+func NewDependency(dependencies repository.DependencyRepository, runs repository.JobRunRepository, queue queue.Queue) *DependencyLoop {
 	return &DependencyLoop{dependencies: dependencies, runs: runs, queue: queue}
 }
 

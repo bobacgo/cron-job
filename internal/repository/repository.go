@@ -4,29 +4,24 @@ import (
 	"database/sql"
 
 	"github.com/bobacgo/cron-job/internal/config"
-	"github.com/bobacgo/cron-job/internal/repository/dependency"
-	"github.com/bobacgo/cron-job/internal/repository/job"
-	"github.com/bobacgo/cron-job/internal/repository/jobrun"
-	"github.com/bobacgo/cron-job/internal/repository/log"
 )
 
 type Repo struct {
-	Dependencies dependency.Repository
-	Job          job.Repository
-	JobRun       jobrun.Repository
-	Log          log.Repository
+	Job          JobRepository
+	JobRun       JobRunRepository
+	Dependencies DependencyRepository
+	Log          LogRepository
 }
 
 func NewRepo(cfg *config.Config, db *sql.DB) *Repo {
-	logRepo, err := log.NewFileRepository(cfg.LogDir)
+	logRepo, err := NewFileLogRepository(cfg.LogDir)
 	if err != nil {
 		panic(err)
 	}
-
 	return &Repo{
-		Dependencies: dependency.NewMySQLRepository(db),
-		Job:          job.NewMySQLRepository(db),
-		JobRun:       jobrun.NewMySQLRepository(db),
+		Job:          &jobRepo{db: db},
+		JobRun:       &jobRunRepo{db: db},
+		Dependencies: &dependencyRepo{db: db},
 		Log:          logRepo,
 	}
 }

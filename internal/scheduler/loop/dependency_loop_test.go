@@ -8,14 +8,13 @@ import (
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	dependencydomain "github.com/bobacgo/cron-job/internal/domain/dependency"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
+	"github.com/bobacgo/cron-job/internal/testkit/repostub"
 )
 
 func TestDependencyLoopReleasesBlockedRun(t *testing.T) {
 	ctx := context.Background()
-	deps := dependencyrepo.NewInMemoryRepository()
-	runs := jobrunrepo.NewInMemoryRepository()
+	deps := repostub.NewDependencyRepo()
+	runs := repostub.NewJobRunRepo()
 	q := queue.NewInMemoryQueue()
 
 	if err := deps.Replace(ctx, "downstream", []dependencydomain.Edge{{JobID: "downstream", DependsOnJobID: "upstream"}}); err != nil {
@@ -66,8 +65,8 @@ func TestDependencyLoopReleasesBlockedRun(t *testing.T) {
 
 func TestDependencyLoopKeepsBlockedWhenUpstreamNotSucceeded(t *testing.T) {
 	ctx := context.Background()
-	deps := dependencyrepo.NewInMemoryRepository()
-	runs := jobrunrepo.NewInMemoryRepository()
+	deps := repostub.NewDependencyRepo()
+	runs := repostub.NewJobRunRepo()
 	q := queue.NewInMemoryQueue()
 
 	if err := deps.Replace(ctx, "downstream", []dependencydomain.Edge{{JobID: "downstream", DependsOnJobID: "upstream"}}); err != nil {

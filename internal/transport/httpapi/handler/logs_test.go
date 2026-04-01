@@ -13,11 +13,9 @@ import (
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	"github.com/bobacgo/cron-job/internal/repository"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
+	"github.com/bobacgo/cron-job/internal/testkit/repostub"
 )
 
 func TestRunLogHandlerSearch(t *testing.T) {
@@ -85,15 +83,16 @@ func TestRunLogHandlerCancelAndRetry(t *testing.T) {
 	}
 }
 
-func buildHandlerService(t *testing.T) (*jobapp.Service, *logrepo.FileRepository, *jobrepo.InMemoryRepository, *jobrunrepo.InMemoryRepository) {
+func buildHandlerService(t *testing.T) (*jobapp.Service, *repository.FileLogRepository, *repostub.JobRepo, *repostub.JobRunRepo) {
 	t.Helper()
-	jobs := jobrepo.NewInMemoryRepository()
-	runs := jobrunrepo.NewInMemoryRepository()
-	deps := dependencyrepo.NewInMemoryRepository()
-	logs, err := logrepo.NewFileRepository(t.TempDir())
+	jobs := repostub.NewJobRepo()
+	runs := repostub.NewJobRunRepo()
+	deps := repostub.NewDependencyRepo()
+	logs, err := repository.NewFileLogRepository(t.TempDir())
 	if err != nil {
 		t.Fatalf("new log repo: %v", err)
 	}
-	svc := jobapp.NewService(jobs, runs, deps, logs, queue.NewInMemoryQueue(), planner.New())
+	repo := &repository.Repo{Job: jobs, JobRun: runs, Dependencies: deps, Log: logs}
+	svc := jobapp.NewService(repo, queue.NewInMemoryQueue(), planner.New())
 	return svc, logs, jobs, runs
 }

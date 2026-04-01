@@ -15,20 +15,19 @@ import (
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	"github.com/bobacgo/cron-job/internal/repository"
 	"github.com/bobacgo/cron-job/internal/transport/admin/viewmodel"
 )
 
 type PageHandler struct {
 	service   *jobapp.Service
-	logs      logrepo.Repository
-	runs      jobrunrepo.Repository
+	logs      repository.LogRepository
+	runs      repository.JobRunRepository
 	auth      *authService
 	templates *template.Template
 }
 
-func NewPageHandler(service *jobapp.Service, runs jobrunrepo.Repository, logs logrepo.Repository) *PageHandler {
+func NewPageHandler(service *jobapp.Service, runs repository.JobRunRepository, logs repository.LogRepository) *PageHandler {
 	return &PageHandler{
 		service:   service,
 		logs:      logs,
@@ -258,7 +257,7 @@ func (h *PageHandler) OpsAudit(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	logItems, err := h.logs.Search(r.Context(), logrepo.Query{Contains: keyword, Limit: 50})
+	logItems, err := h.logs.Search(r.Context(), repository.LogQuery{Contains: keyword, Limit: 50})
 	if err != nil {
 		logItems = nil
 	}

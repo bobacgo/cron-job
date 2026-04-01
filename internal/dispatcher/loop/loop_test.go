@@ -12,10 +12,8 @@ import (
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	"github.com/bobacgo/cron-job/internal/executor"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	"github.com/bobacgo/cron-job/internal/repository"
+	"github.com/bobacgo/cron-job/internal/testkit/repostub"
 )
 
 type failOnceExecutor struct {
@@ -32,11 +30,9 @@ func (e *failOnceExecutor) Execute(_ context.Context, req executor.Request) (exe
 
 func TestDispatcherSchedulesRetryAfterFailure(t *testing.T) {
 	ctx := context.Background()
-	jobs := jobrepo.NewInMemoryRepository()
-	runs := jobrunrepo.NewInMemoryRepository()
-	deps := dependencyrepo.NewInMemoryRepository()
-	_ = deps
-	logs, err := logrepo.NewFileRepository(t.TempDir())
+	jobs := repostub.NewJobRepo()
+	runs := repostub.NewJobRunRepo()
+	logs, err := repository.NewFileLogRepository(t.TempDir())
 	if err != nil {
 		t.Fatalf("new log repo: %v", err)
 	}
@@ -69,7 +65,8 @@ func TestDispatcherSchedulesRetryAfterFailure(t *testing.T) {
 		t.Fatalf("enqueue: %v", err)
 	}
 
-	l := New(jobs, runs, logs, q, leases, cancels, registry)
+	repo := &repository.Repo{Job: jobs, JobRun: runs, Log: logs}
+	l := New(repo, q, leases, cancels, registry)
 	l.tick(ctx)
 
 	all, err := runs.List(ctx)
@@ -106,9 +103,9 @@ func TestDispatcherSchedulesRetryAfterFailure(t *testing.T) {
 
 func TestDispatcherCooperativeCancel(t *testing.T) {
 	ctx := context.Background()
-	jobs := jobrepo.NewInMemoryRepository()
-	runs := jobrunrepo.NewInMemoryRepository()
-	logs, err := logrepo.NewFileRepository(t.TempDir())
+	jobs := repostub.NewJobRepo()
+	runs := repostub.NewJobRunRepo()
+	logs, err := repository.NewFileLogRepository(t.TempDir())
 	if err != nil {
 		t.Fatalf("new log repo: %v", err)
 	}
@@ -124,7 +121,8 @@ func TestDispatcherCooperativeCancel(t *testing.T) {
 	_ = runs.Save(ctx, run)
 	_ = q.Enqueue(ctx, run.ID)
 
-	l := New(jobs, runs, logs, q, leases, cancels, registry)
+	repo := &repository.Repo{Job: jobs, JobRun: runs, Log: logs}
+	l := New(repo, q, leases, cancels, registry)
 	done := make(chan struct{})
 	go func() {
 		l.tick(ctx)

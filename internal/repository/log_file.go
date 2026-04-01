@@ -1,4 +1,4 @@
-package log
+package repository
 
 import (
 	"context"
@@ -13,19 +13,20 @@ import (
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
 )
 
-type FileRepository struct {
+// FileLogRepository persists run logs as plain text files on disk.
+type FileLogRepository struct {
 	mu      sync.Mutex
 	baseDir string
 }
 
-func NewFileRepository(baseDir string) (*FileRepository, error) {
+func NewFileLogRepository(baseDir string) (*FileLogRepository, error) {
 	if err := os.MkdirAll(baseDir, 0o755); err != nil {
 		return nil, err
 	}
-	return &FileRepository{baseDir: baseDir}, nil
+	return &FileLogRepository{baseDir: baseDir}, nil
 }
 
-func (r *FileRepository) Append(_ context.Context, record runlog.LogRecord) error {
+func (r *FileLogRepository) Append(_ context.Context, record runlog.LogRecord) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	path := filepath.Join(r.baseDir, record.RunID+".log")
@@ -48,29 +49,28 @@ func (r *FileRepository) Append(_ context.Context, record runlog.LogRecord) erro
 	return err
 }
 
-func (r *FileRepository) Read(_ context.Context, runID string) (string, error) {
+func (r *FileLogRepository) Read(_ context.Context, runID string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	path := filepath.Join(r.baseDir, runID+".log")
-	data, err := readPath(path)
+	data, err := readLogFile(filepath.Join(r.baseDir, runID+".log"))
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
 }
 
-func (r *FileRepository) ReadStream(_ context.Context, runID, stream string) (string, error) {
+func (r *FileLogRepository) ReadStream(_ context.Context, runID, stream string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	path := filepath.Join(r.baseDir, fmt.Sprintf("%s.%s.log", runID, sanitizeStream(stream)))
-	data, err := readPath(path)
+	data, err := readLogFile(path)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
 }
 
-func (r *FileRepository) Search(_ context.Context, query Query) ([]SearchItem, error) {
+func (r *FileLogRepository) Search(_ context.Context, query LogQuery) ([]LogSearchItem, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -78,31 +78,30 @@ func (r *FileRepository) Search(_ context.Context, query Query) ([]SearchItem, e
 	if limit <= 0 {
 		limit = 100
 	}
-	paths, err := r.searchPaths(query)
+	paths, err := r.searchLogPaths(query)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]SearchItem, 0)
+	items := make([]LogSearchItem, 0)
 	contains := strings.ToLower(strings.TrimSpace(query.Contains))
 	streamFilter := strings.ToLower(strings.TrimSpace(query.Stream))
 	for _, path := range paths {
-		data, err := readPath(path)
+		data, err := readLogFile(path)
 		if err != nil {
 			return nil, err
 		}
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(string(data), "\n") {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
-			entry, ok := parseLine(line)
+			entry, ok := parseLogLine(line)
 			if !ok {
 				continue
 			}
 			if query.RunID != "" {
 				entry.RunID = query.RunID
 			} else {
-				entry.RunID = runIDFromPath(path)
+				entry.RunID = runIDFromLogPath(path)
 			}
 			if streamFilter != "" && strings.ToLower(entry.Stream) != streamFilter {
 				continue
@@ -119,7 +118,7 @@ func (r *FileRepository) Search(_ context.Context, query Query) ([]SearchItem, e
 	return items, nil
 }
 
-func (r *FileRepository) searchPaths(query Query) ([]string, error) {
+func (r *FileLogRepository) searchLogPaths(query LogQuery) ([]string, error) {
 	if query.RunID != "" {
 		if strings.TrimSpace(query.Stream) != "" {
 			return []string{filepath.Join(r.baseDir, fmt.Sprintf("%s.%s.log", query.RunID, sanitizeStream(query.Stream)))}, nil
@@ -148,7 +147,7 @@ func (r *FileRepository) searchPaths(query Query) ([]string, error) {
 	return paths, nil
 }
 
-func readPath(path string) ([]byte, error) {
+func readLogFile(path string) ([]byte, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -170,21 +169,21 @@ func sanitizeStream(stream string) string {
 	return "stdout"
 }
 
-func parseLine(line string) (SearchItem, bool) {
+func parseLogLine(line string) (LogSearchItem, bool) {
 	if !strings.HasPrefix(line, "[") {
-		return SearchItem{}, false
+		return LogSearchItem{}, false
 	}
 	first := strings.Index(line, "]")
 	if first <= 1 {
-		return SearchItem{}, false
+		return LogSearchItem{}, false
 	}
 	remaining := strings.TrimSpace(line[first+1:])
 	if !strings.HasPrefix(remaining, "[") {
-		return SearchItem{}, false
+		return LogSearchItem{}, false
 	}
 	second := strings.Index(remaining, "]")
 	if second <= 1 {
-		return SearchItem{}, false
+		return LogSearchItem{}, false
 	}
 	rawTime := line[1:first]
 	rawStream := remaining[1:second]
@@ -193,10 +192,10 @@ func parseLine(line string) (SearchItem, bool) {
 	if err != nil {
 		occurredAt = time.Time{}
 	}
-	return SearchItem{Stream: rawStream, Content: rawContent, OccurredAt: occurredAt}, true
+	return LogSearchItem{Stream: rawStream, Content: rawContent, OccurredAt: occurredAt}, true
 }
 
-func runIDFromPath(path string) string {
+func runIDFromLogPath(path string) string {
 	base := filepath.Base(path)
 	return strings.TrimSuffix(base, ".log")
 }

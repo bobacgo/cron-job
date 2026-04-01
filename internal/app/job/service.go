@@ -15,7 +15,6 @@ import (
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
 	"github.com/bobacgo/cron-job/internal/repository"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 )
 
@@ -191,7 +190,7 @@ func (s *Service) ReadRunLogStream(ctx context.Context, runID, stream string) (s
 	return s.repo.Log.ReadStream(ctx, runID, stream)
 }
 
-func (s *Service) SearchRunLogs(ctx context.Context, query logrepo.Query) ([]logrepo.SearchItem, error) {
+func (s *Service) SearchRunLogs(ctx context.Context, query repository.LogQuery) ([]repository.LogSearchItem, error) {
 	return s.repo.Log.Search(ctx, query)
 }
 

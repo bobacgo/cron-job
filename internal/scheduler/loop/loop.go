@@ -10,16 +10,13 @@ import (
 	"github.com/bobacgo/cron-job/internal/dispatcher/queue"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	"github.com/bobacgo/cron-job/internal/repository"
-	dependencyrepo "github.com/bobacgo/cron-job/internal/repository/dependency"
-	jobrepo "github.com/bobacgo/cron-job/internal/repository/job"
-	jobrunrepo "github.com/bobacgo/cron-job/internal/repository/jobrun"
 	"github.com/bobacgo/cron-job/internal/scheduler/planner"
 )
 
 type Loop struct {
-	jobs    jobrepo.Repository
-	runs    jobrunrepo.Repository
-	deps    dependencyrepo.Repository
+	jobs    repository.JobRepository
+	runs    repository.JobRunRepository
+	deps    repository.DependencyRepository
 	queue   queue.Queue
 	planner *planner.Planner
 }

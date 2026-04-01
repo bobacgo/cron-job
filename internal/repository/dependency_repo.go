@@ -1,4 +1,4 @@
-package dependency
+package repository
 
 import (
 	"context"
@@ -7,15 +7,9 @@ import (
 	dependencydomain "github.com/bobacgo/cron-job/internal/domain/dependency"
 )
 
-type MySQLRepository struct {
-	db *sql.DB
-}
+type dependencyRepo struct{ db *sql.DB }
 
-func NewMySQLRepository(db *sql.DB) *MySQLRepository {
-	return &MySQLRepository{db: db}
-}
-
-func (r *MySQLRepository) Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error {
+func (r *dependencyRepo) Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -33,34 +27,25 @@ func (r *MySQLRepository) Replace(ctx context.Context, jobID string, edges []dep
 	return tx.Commit()
 }
 
-func (r *MySQLRepository) ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error) {
+func (r *dependencyRepo) ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies WHERE job_id = ? ORDER BY depends_on_job_id ASC`, jobID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
-	items := make([]dependencydomain.Edge, 0)
-	for rows.Next() {
-		var edge dependencydomain.Edge
-		if err := rows.Scan(&edge.JobID, &edge.DependsOnJobID); err != nil {
-			return nil, err
-		}
-		items = append(items, edge)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return scanEdges(rows)
 }
 
-func (r *MySQLRepository) ListAll(ctx context.Context) ([]dependencydomain.Edge, error) {
+func (r *dependencyRepo) ListAll(ctx context.Context) ([]dependencydomain.Edge, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies ORDER BY job_id ASC, depends_on_job_id ASC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return scanEdges(rows)
+}
 
+func scanEdges(rows *sql.Rows) ([]dependencydomain.Edge, error) {
 	items := make([]dependencydomain.Edge, 0)
 	for rows.Next() {
 		var edge dependencydomain.Edge
@@ -69,8 +54,5 @@ func (r *MySQLRepository) ListAll(ctx context.Context) ([]dependencydomain.Edge,
 		}
 		items = append(items, edge)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, rows.Err()
 }

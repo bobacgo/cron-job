@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
-	logrepo "github.com/bobacgo/cron-job/internal/repository/log"
+	"github.com/bobacgo/cron-job/internal/repository"
 )
 
 type RunLogHandler struct {
@@ -63,7 +63,7 @@ func (h *RunLogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	items, err := h.service.SearchRunLogs(r.Context(), logrepo.Query{
+	items, err := h.service.SearchRunLogs(r.Context(), repository.LogQuery{
 		RunID:    strings.TrimSpace(r.URL.Query().Get("run_id")),
 		Stream:   strings.TrimSpace(r.URL.Query().Get("stream")),
 		Contains: strings.TrimSpace(r.URL.Query().Get("q")),
