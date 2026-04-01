@@ -39,14 +39,14 @@ func (r *jobRunRepo) Get(ctx context.Context, id string) (jobrundomain.JobRun, e
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE id = ?
 `, id)
-	item, err := scanRun(row.Scan)
+	item, err := r.scanRun(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return jobrundomain.JobRun{}, ErrNotFound
 		}
 		return jobrundomain.JobRun{}, err
 	}
-	return item, nil
+	return *item, nil
 }
 
 func (r *jobRunRepo) List(ctx context.Context) ([]jobrundomain.JobRun, error) {
@@ -75,14 +75,14 @@ func (r *jobRunRepo) FindByDedupKey(ctx context.Context, key string) (jobrundoma
 SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
 FROM job_runs WHERE dedup_key = ? LIMIT 1
 `, key)
-	item, err := scanRun(row.Scan)
+	item, err := r.scanRun(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return jobrundomain.JobRun{}, false, nil
 		}
 		return jobrundomain.JobRun{}, false, err
 	}
-	return item, true, nil
+	return *item, true, nil
 }
 
 func (r *jobRunRepo) listQuery(ctx context.Context, query string, args ...any) ([]jobrundomain.JobRun, error) {
@@ -93,48 +93,29 @@ func (r *jobRunRepo) listQuery(ctx context.Context, query string, args ...any) (
 	defer rows.Close()
 	items := make([]jobrundomain.JobRun, 0)
 	for rows.Next() {
-		item, err := scanRun(rows.Scan)
+		item, err := r.scanRun(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, item)
+		items = append(items, *item)
 	}
 	return items, rows.Err()
 }
 
-func scanRun(scan scanFunc) (jobrundomain.JobRun, error) {
-	var (
-		id          string
-		jobID       string
-		scheduledAt string
-		startedAt   string
-		finishedAt  string
-		status      string
-		attempt     int
-		triggerType string
-		message     string
-		createdAt   string
-		updatedAt   string
+func (r *jobRunRepo) scanRun(scan scanFunc) (*jobrundomain.JobRun, error) {
+	row := &jobrundomain.JobRun{}
+	err := scan(
+		&row.ID,
+		&row.JobID,
+		&row.ScheduledAt,
+		&row.StartedAt,
+		&row.FinishedAt,
+		&row.Status,
+		&row.Attempt,
+		&row.TriggerType,
+		&row.Message,
+		&row.CreatedAt,
+		&row.UpdatedAt,
 	)
-	if err := scan(
-		&id, &jobID,
-		&scheduledAt, &startedAt, &finishedAt,
-		&status, &attempt, &triggerType, &message,
-		&createdAt, &updatedAt,
-	); err != nil {
-		return jobrundomain.JobRun{}, err
-	}
-	return jobrundomain.JobRun{
-		ID:          id,
-		JobID:       jobID,
-		ScheduledAt: parseTime(scheduledAt),
-		StartedAt:   parseTime(startedAt),
-		FinishedAt:  parseTime(finishedAt),
-		Status:      jobrundomain.Status(status),
-		Attempt:     attempt,
-		TriggerType: triggerType,
-		Message:     message,
-		CreatedAt:   parseTime(createdAt),
-		UpdatedAt:   parseTime(updatedAt),
-	}, nil
+	return row, err
 }

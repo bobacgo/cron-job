@@ -27,7 +27,9 @@ type JobRunRepository interface {
 }
 
 type DependencyRepository interface {
+	// Replace 会删除 jobID 相关的所有依赖关系，并替换为 edges 中的依赖关系
 	Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error
+	// ListByJob 会返回 jobID 相关的所有依赖关系，即 edges 中的 JobID 都是 jobID
 	ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error)
 	ListAll(ctx context.Context) ([]dependencydomain.Edge, error)
 }
