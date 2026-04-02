@@ -1,4 +1,4 @@
-package database
+package sqlx
 
 import (
 	"database/sql"
@@ -6,12 +6,14 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"time"
 
 	"github.com/bobacgo/cron-job/kit/types"
 )
 
 type DB struct {
 	*sql.DB
+	slowThreshold time.Duration
 }
 
 func (d DB) Validate() error {
@@ -33,6 +35,6 @@ func NewDBManager(cfgKV types.ConfigMap[Config]) (types.ConfigMap[DB], error) {
 	}
 	keys := slices.Collect(maps.Keys(dbs))
 	slices.Sort(keys)
-	slog.Info("database instances object", "drivers", keys)
+	slog.Info("sqlx instances object", "drivers", keys)
 	return dbs, nil
 }

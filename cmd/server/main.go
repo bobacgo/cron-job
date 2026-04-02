@@ -23,8 +23,8 @@ import (
 	httpapihandler "github.com/bobacgo/cron-job/internal/transport/httpapi/handler"
 	"github.com/bobacgo/cron-job/internal/transport/httpapi/router"
 	"github.com/bobacgo/cron-job/kit/core"
-	"github.com/bobacgo/cron-job/kit/database"
 	"github.com/bobacgo/cron-job/kit/slogx"
+	"github.com/bobacgo/cron-job/kit/sqlx"
 	"github.com/bobacgo/cron-job/kit/types"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -40,7 +40,7 @@ type Beans struct {
 
 type App struct {
 	Cfg      *config.Config
-	DB       types.ConfigMap[database.DB]
+	DB       types.ConfigMap[sqlx.DB]
 	HttpAddr string
 	Beans    *Beans
 }
@@ -67,7 +67,7 @@ func main() {
 	// 初始化数据库
 	server.Init(func(app *App) error {
 		var err error
-		app.DB, err = database.NewDBManager(app.Cfg.Database)
+		app.DB, err = sqlx.NewDBManager(app.Cfg.Database)
 		return err
 	})
 	server.Init(func(app *App) error {
@@ -102,7 +102,7 @@ func main() {
 
 // 对象容器
 func initBeans(app *App) error {
-	db := app.DB.Default().DB
+	db := app.DB.Default()
 	repo := repository.NewRepo(app.Cfg, db)
 
 	executorRegistry := executor.NewRegistry()

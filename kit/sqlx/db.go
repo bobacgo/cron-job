@@ -1,4 +1,4 @@
-package database
+package sqlx
 
 import (
 	"database/sql"
@@ -26,5 +26,8 @@ func NewDB(conf *Config) (*DB, error) {
 	// 控制空闲连接的最长时间，防止长期空闲的连接占用资源。
 	// 典型值 10min，根据业务需求调整。
 	db.SetConnMaxIdleTime(conf.MaxIdleTime.TimeDuration()) // 空闲连接的最大生存时间
-	return &DB{DB: db}, nil
+	return &DB{
+		DB:            db,
+		slowThreshold: conf.SlowThreshold.TimeDuration(),
+	}, nil
 }

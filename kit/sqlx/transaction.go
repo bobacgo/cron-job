@@ -1,4 +1,4 @@
-package database
+package sqlx
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func (t *Transaction) WithOpts(opts *sql.TxOptions) *Transaction {
 	return t
 }
 
-func (t *Transaction) Exec(ctx context.Context, db *sql.DB) (err error) {
+func (t *Transaction) Exec(ctx context.Context, db *DB) (err error) {
 	tx, err := db.BeginTx(ctx, t.opts)
 	if err != nil {
 		return err

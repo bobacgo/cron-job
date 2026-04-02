@@ -9,9 +9,10 @@ import (
 	"time"
 
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
+	"github.com/bobacgo/cron-job/kit/sqlx"
 )
 
-type jobRepo struct{ db *sql.DB }
+type jobRepo struct{ db *sqlx.DB }
 
 // jobFields 是 jobs 表的字段列表
 var jobFields = []string{
@@ -144,9 +145,6 @@ func (r *jobRepo) Get(ctx context.Context, id string) (jobdomain.Job, error) {
 	row := r.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT %s FROM jobs WHERE id = ?`, jobSelectCols), id)
 	job, err := scanJob(row.Scan)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return jobdomain.Job{}, ErrNotFound
-		}
 		return jobdomain.Job{}, err
 	}
 	return job, nil

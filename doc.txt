@@ -1,1 +1,4 @@
 lsof -ti:8080 | xargs kill -9
+
+http
+1. 慢请求 top 10

@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	dependencydomain "github.com/bobacgo/cron-job/internal/domain/dependency"
-	"github.com/bobacgo/cron-job/kit/database"
+	"github.com/bobacgo/cron-job/kit/sqlx"
 )
 
-type dependencyRepo struct{ db *sql.DB }
+type dependencyRepo struct{ db *sqlx.DB }
 
 var dependencyFields = []string{
 	"job_id",
@@ -18,7 +18,7 @@ var dependencyFields = []string{
 }
 
 func (r *dependencyRepo) Replace(ctx context.Context, jobID string, edges []dependencydomain.Edge) error {
-	tx := database.Tx(func(ctx context.Context, tx *sql.Tx) error {
+	tx := sqlx.Tx(func(ctx context.Context, tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM dependencies WHERE job_id = ?`, jobID); err != nil {
 			return fmt.Errorf("delete dependencies: %w", err)
 		}

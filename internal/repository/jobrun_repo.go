@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
+	"github.com/bobacgo/cron-job/kit/sqlx"
 )
 
-type jobRunRepo struct{ db *sql.DB }
+type jobRunRepo struct{ db *sqlx.DB }
 
 // jobRunFields 是 job_runs 表的 SELECT 字段列表（不含 dedup_key）
 var jobRunFields = []string{
@@ -98,9 +99,6 @@ func (r *jobRunRepo) Get(ctx context.Context, id string) (jobrundomain.JobRun, e
 		fmt.Sprintf(`SELECT %s FROM job_runs WHERE id = ?`, jobRunSelectCols), id)
 	item, err := r.scanRun(row.Scan)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return jobrundomain.JobRun{}, ErrNotFound
-		}
 		return jobrundomain.JobRun{}, err
 	}
 	return *item, nil

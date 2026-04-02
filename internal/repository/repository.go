@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/bobacgo/cron-job/internal/config"
@@ -10,6 +9,7 @@ import (
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
 	jobrundomain "github.com/bobacgo/cron-job/internal/domain/jobrun"
 	runlog "github.com/bobacgo/cron-job/internal/domain/log"
+	"github.com/bobacgo/cron-job/kit/sqlx"
 )
 
 type Repo struct {
@@ -19,7 +19,7 @@ type Repo struct {
 	Log          LogRepository
 }
 
-func NewRepo(cfg *config.Config, db *sql.DB) *Repo {
+func NewRepo(cfg *config.Config, db *sqlx.DB) *Repo {
 	logRepo, err := NewFileLogRepository(cfg.LogDir)
 	if err != nil {
 		panic(err)
