@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	jobdomain "github.com/bobacgo/cron-job/internal/domain/job"
@@ -11,117 +13,135 @@ import (
 
 type jobRepo struct{ db *sql.DB }
 
-const selectJobColumns = `
-	id,
-	name,
-	description,
-	enabled,
-	schedule_cron,
-	schedule_interval_seconds,
-	schedule_time_zone,
-	schedule_starting_deadline_seconds,
-	executor_kind,
-	sdk_protocol,
-	sdk_url,
-	sdk_method,
-	sdk_timeout_seconds,
-	binary_command,
-	binary_args_json,
-	binary_timeout_seconds,
-	shell_script,
-	shell_shell,
-	shell_timeout_seconds,
-	retry_max_retries,
-	retry_initial_backoff_seconds,
-	retry_max_backoff_seconds,
-	retry_backoff_multiple,
-	concurrency_policy,
-	next_run_at,
-	last_run_at,
-	last_success_at,
-	created_at,
-	updated_at`
+// jobFields 是 jobs 表的字段列表
+var jobFields = []string{
+	"id",
+	"name",
+	"description",
+	"enabled",
+	"schedule_cron",
+	"schedule_interval_seconds",
+	"schedule_time_zone",
+	"schedule_starting_deadline_seconds",
+	"executor_kind",
+	"sdk_protocol",
+	"sdk_url",
+	"sdk_method",
+	"sdk_timeout_seconds",
+	"binary_command",
+	"binary_args_json",
+	"binary_timeout_seconds",
+	"shell_script",
+	"shell_shell",
+	"shell_timeout_seconds",
+	"retry_max_retries",
+	"retry_initial_backoff_seconds",
+	"retry_max_backoff_seconds",
+	"retry_backoff_multiple",
+	"concurrency_policy",
+	"next_run_at",
+	"last_run_at",
+	"last_success_at",
+	"created_at",
+	"updated_at",
+}
+
+var jobSelectCols = strings.Join(jobFields, ", ")
 
 func (r *jobRepo) Save(ctx context.Context, job jobdomain.Job) error {
 	binaryArgsJSON, err := json.Marshal(jobBinaryArgs(job))
 	if err != nil {
 		return err
 	}
-	_, err = r.db.ExecContext(ctx, `
-INSERT INTO jobs (
-	id,
-	name,
-	description,
-	enabled,
-	schedule_cron,
-	schedule_interval_seconds,
-	schedule_time_zone,
-	schedule_starting_deadline_seconds,
-	executor_kind,
-	sdk_protocol,
-	sdk_url,
-	sdk_method,
-	sdk_timeout_seconds,
-	binary_command,
-	binary_args_json,
-	binary_timeout_seconds,
-	shell_script,
-	shell_shell,
-	shell_timeout_seconds,
-	retry_max_retries,
-	retry_initial_backoff_seconds,
-	retry_max_backoff_seconds,
-	retry_backoff_multiple,
-	concurrency_policy,
-	next_run_at,
-	last_run_at,
-	last_success_at,
-	created_at,
-	updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-	name=VALUES(name),
-	description=VALUES(description),
-	enabled=VALUES(enabled),
-	schedule_cron=VALUES(schedule_cron),
-	schedule_interval_seconds=VALUES(schedule_interval_seconds),
-	schedule_time_zone=VALUES(schedule_time_zone),
-	schedule_starting_deadline_seconds=VALUES(schedule_starting_deadline_seconds),
-	executor_kind=VALUES(executor_kind),
-	sdk_protocol=VALUES(sdk_protocol),
-	sdk_url=VALUES(sdk_url),
-	sdk_method=VALUES(sdk_method),
-	sdk_timeout_seconds=VALUES(sdk_timeout_seconds),
-	binary_command=VALUES(binary_command),
-	binary_args_json=VALUES(binary_args_json),
-	binary_timeout_seconds=VALUES(binary_timeout_seconds),
-	shell_script=VALUES(shell_script),
-	shell_shell=VALUES(shell_shell),
-	shell_timeout_seconds=VALUES(shell_timeout_seconds),
-	retry_max_retries=VALUES(retry_max_retries),
-	retry_initial_backoff_seconds=VALUES(retry_initial_backoff_seconds),
-	retry_max_backoff_seconds=VALUES(retry_max_backoff_seconds),
-	retry_backoff_multiple=VALUES(retry_backoff_multiple),
-	concurrency_policy=VALUES(concurrency_policy),
-	next_run_at=VALUES(next_run_at),
-	last_run_at=VALUES(last_run_at),
-	last_success_at=VALUES(last_success_at),
-	updated_at=VALUES(updated_at)
-`,
-		job.ID, job.Name, job.Description, boolToInt(job.Enabled),
-		job.Schedule.Cron, int64(job.Schedule.Interval.Seconds()), job.Schedule.TimeZone, job.Schedule.StartingDeadlineSeconds,
-		job.Executor.Kind, jobSDKProtocol(job), jobSDKURL(job), jobSDKMethod(job), int64(jobSDKTimeout(job).Seconds()),
-		jobBinaryCommand(job), string(binaryArgsJSON), int64(jobBinaryTimeout(job).Seconds()),
-		jobShellScript(job), jobShellShell(job), int64(jobShellTimeout(job).Seconds()),
-		job.RetryPolicy.MaxRetries, int64(job.RetryPolicy.InitialBackoff.Seconds()), int64(job.RetryPolicy.MaxBackoff.Seconds()), job.RetryPolicy.BackoffMultiple,
-		job.ConcurrencyPolicy, formatTime(job.NextRunAt), formatTime(job.LastRunAt), formatTime(job.LastSuccessAt),
-		formatTime(job.CreatedAt), formatTime(job.UpdatedAt),
+	values := buildJobFieldValues(job, string(binaryArgsJSON))
+
+	err = r.existsByID(ctx, job.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return r.insert(ctx, values)
+		}
+		return err
+	}
+	return r.update(ctx, values)
+}
+
+func (r *jobRepo) existsByID(ctx context.Context, id string) error {
+	return r.db.QueryRowContext(ctx, `SELECT 1 FROM jobs WHERE id = ? LIMIT 1`, id).Scan(new(int))
+}
+
+func (r *jobRepo) insert(ctx context.Context, values map[string]any) error {
+	insertFields := append([]string{}, jobFields...)
+	cols := strings.Join(insertFields, ", ")
+	placeholders := strings.Trim(strings.Repeat("?, ", len(insertFields)), ", ")
+	args := make([]any, 0, len(insertFields))
+	for _, field := range insertFields {
+		args = append(args, values[field])
+	}
+
+	_, err := r.db.ExecContext(ctx,
+		fmt.Sprintf(`INSERT INTO jobs (%s) VALUES (%s)`, cols, placeholders),
+		args...,
 	)
 	return err
 }
 
+func (r *jobRepo) update(ctx context.Context, values map[string]any) error {
+	updateFields := append([]string{}, jobFields...)
+	skipUpdate := map[string]bool{"id": true, "created_at": true}
+	setClauses := make([]string, 0, len(updateFields))
+	args := make([]any, 0, len(updateFields))
+	for _, field := range updateFields {
+		if skipUpdate[field] {
+			continue
+		}
+		setClauses = append(setClauses, field+" = ?")
+		args = append(args, values[field])
+	}
+	args = append(args, values["id"])
+
+	_, err := r.db.ExecContext(ctx,
+		fmt.Sprintf(`UPDATE jobs SET %s WHERE id = ?`, strings.Join(setClauses, ", ")),
+		args...,
+	)
+	return err
+}
+
+func buildJobFieldValues(job jobdomain.Job, binaryArgsJSON string) map[string]any {
+	return map[string]any{
+		"id":                                 job.ID,
+		"name":                               job.Name,
+		"description":                        job.Description,
+		"enabled":                            boolToInt(job.Enabled),
+		"schedule_cron":                      job.Schedule.Cron,
+		"schedule_interval_seconds":          int64(job.Schedule.Interval.Seconds()),
+		"schedule_time_zone":                 job.Schedule.TimeZone,
+		"schedule_starting_deadline_seconds": job.Schedule.StartingDeadlineSeconds,
+		"executor_kind":                      job.Executor.Kind,
+		"sdk_protocol":                       jobSDKProtocol(job),
+		"sdk_url":                            jobSDKURL(job),
+		"sdk_method":                         jobSDKMethod(job),
+		"sdk_timeout_seconds":                int64(jobSDKTimeout(job).Seconds()),
+		"binary_command":                     jobBinaryCommand(job),
+		"binary_args_json":                   binaryArgsJSON,
+		"binary_timeout_seconds":             int64(jobBinaryTimeout(job).Seconds()),
+		"shell_script":                       jobShellScript(job),
+		"shell_shell":                        jobShellShell(job),
+		"shell_timeout_seconds":              int64(jobShellTimeout(job).Seconds()),
+		"retry_max_retries":                  job.RetryPolicy.MaxRetries,
+		"retry_initial_backoff_seconds":      int64(job.RetryPolicy.InitialBackoff.Seconds()),
+		"retry_max_backoff_seconds":          int64(job.RetryPolicy.MaxBackoff.Seconds()),
+		"retry_backoff_multiple":             job.RetryPolicy.BackoffMultiple,
+		"concurrency_policy":                 job.ConcurrencyPolicy,
+		"next_run_at":                        job.NextRunAt,
+		"last_run_at":                        job.LastRunAt,
+		"last_success_at":                    job.LastSuccessAt,
+		"created_at":                         job.CreatedAt,
+		"updated_at":                         job.UpdatedAt,
+	}
+}
+
 func (r *jobRepo) Get(ctx context.Context, id string) (jobdomain.Job, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT`+selectJobColumns+` FROM jobs WHERE id = ?`, id)
+	row := r.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT %s FROM jobs WHERE id = ?`, jobSelectCols), id)
 	job, err := scanJob(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -133,7 +153,7 @@ func (r *jobRepo) Get(ctx context.Context, id string) (jobdomain.Job, error) {
 }
 
 func (r *jobRepo) List(ctx context.Context) ([]jobdomain.Job, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT`+selectJobColumns+` FROM jobs ORDER BY created_at ASC`)
+	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`SELECT %s FROM jobs ORDER BY created_at ASC`, jobSelectCols))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +162,7 @@ func (r *jobRepo) List(ctx context.Context) ([]jobdomain.Job, error) {
 }
 
 func (r *jobRepo) ListEnabled(ctx context.Context) ([]jobdomain.Job, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT`+selectJobColumns+` FROM jobs WHERE enabled = 1 ORDER BY created_at ASC`)
+	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`SELECT %s FROM jobs WHERE enabled = 1 ORDER BY created_at ASC`, jobSelectCols))
 	if err != nil {
 		return nil, err
 	}
@@ -229,11 +249,11 @@ func scanJob(scan scanFunc) (jobdomain.Job, error) {
 			BackoffMultiple: retryBackoffMultiple,
 		},
 		ConcurrencyPolicy: jobdomain.ConcurrencyPolicy(concurrencyPolicy),
-		NextRunAt:         parseTime(nextRunAt),
-		LastRunAt:         parseTime(lastRunAt),
-		LastSuccessAt:     parseTime(lastSuccessAt),
-		CreatedAt:         parseTime(createdAt),
-		UpdatedAt:         parseTime(updatedAt),
+		NextRunAt:         nextRunAt,
+		LastRunAt:         lastRunAt,
+		LastSuccessAt:     lastSuccessAt,
+		CreatedAt:         createdAt,
+		UpdatedAt:         updatedAt,
 	}
 	job.Executor.Kind = jobdomain.ExecutorKind(executorKind)
 	if job.Executor.Kind == jobdomain.ExecutorKindSDK {
