@@ -57,16 +57,16 @@ func TestRunLogHandlerCancelAndRetry(t *testing.T) {
 			Binary: &jobdomain.BinaryTarget{Command: "/bin/echo", Args: []string{"ok"}},
 		},
 		RetryPolicy: jobdomain.RetryPolicy{MaxRetries: 2},
-		CreatedAt:   time.Now().UTC(),
-		UpdatedAt:   time.Now().UTC(),
+		CreatedAt:   time.Now().UTC().Unix(),
+		UpdatedAt:   time.Now().UTC().Unix(),
 	}
 	if err := jobs.Save(ctx, job); err != nil {
 		t.Fatalf("save job: %v", err)
 	}
-	if err := runs.Save(ctx, jobrundomain.JobRun{ID: "run-cancel", JobID: job.ID, Status: jobrundomain.StatusReady, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}); err != nil {
+	if err := runs.Save(ctx, jobrundomain.JobRun{ID: "run-cancel", JobID: job.ID, Status: jobrundomain.StatusReady, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC().Unix(), UpdatedAt: time.Now().UTC().Unix()}); err != nil {
 		t.Fatalf("save run-cancel: %v", err)
 	}
-	if err := runs.Save(ctx, jobrundomain.JobRun{ID: "run-failed", JobID: job.ID, Status: jobrundomain.StatusFailed, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}); err != nil {
+	if err := runs.Save(ctx, jobrundomain.JobRun{ID: "run-failed", JobID: job.ID, Status: jobrundomain.StatusFailed, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC().Unix(), UpdatedAt: time.Now().UTC().Unix()}); err != nil {
 		t.Fatalf("save run-failed: %v", err)
 	}
 

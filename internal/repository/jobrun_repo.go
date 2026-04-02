@@ -11,21 +11,32 @@ type jobRunRepo struct{ db *sql.DB }
 
 func (r *jobRunRepo) Save(ctx context.Context, run jobrundomain.JobRun) error {
 	_, err := r.db.ExecContext(ctx, `
-INSERT INTO job_runs (
-	id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at, dedup_key
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE
-	job_id=VALUES(job_id),
-	scheduled_at=VALUES(scheduled_at),
-	started_at=VALUES(started_at),
-	finished_at=VALUES(finished_at),
-	status=VALUES(status),
-	attempt=VALUES(attempt),
-	trigger_type=VALUES(trigger_type),
-	message=VALUES(message),
-	updated_at=VALUES(updated_at),
-	dedup_key=VALUES(dedup_key)
-`,
+	INSERT INTO job_runs (
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at,
+		dedup_key
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON DUPLICATE KEY UPDATE
+		job_id=VALUES(job_id),
+		scheduled_at=VALUES(scheduled_at),
+		started_at=VALUES(started_at),
+		finished_at=VALUES(finished_at),
+		status=VALUES(status),
+		attempt=VALUES(attempt),
+		trigger_type=VALUES(trigger_type),
+		message=VALUES(message),
+		updated_at=VALUES(updated_at),
+		dedup_key=VALUES(dedup_key)
+	`,
 		run.ID, run.JobID,
 		formatTime(run.ScheduledAt), formatTime(run.StartedAt), formatTime(run.FinishedAt),
 		string(run.Status), run.Attempt, run.TriggerType, run.Message,
@@ -36,9 +47,20 @@ ON DUPLICATE KEY UPDATE
 
 func (r *jobRunRepo) Get(ctx context.Context, id string) (jobrundomain.JobRun, error) {
 	row := r.db.QueryRowContext(ctx, `
-SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
-FROM job_runs WHERE id = ?
-`, id)
+	SELECT
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at
+	FROM job_runs WHERE id = ?
+	`, id)
 	item, err := r.scanRun(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -51,30 +73,74 @@ FROM job_runs WHERE id = ?
 
 func (r *jobRunRepo) List(ctx context.Context) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
-SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
-FROM job_runs ORDER BY created_at DESC
-`)
+	SELECT
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at
+	FROM job_runs ORDER BY created_at DESC
+	`)
 }
 
 func (r *jobRunRepo) ListByJob(ctx context.Context, jobID string) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
-SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
-FROM job_runs WHERE job_id = ? ORDER BY created_at DESC
-`, jobID)
+	SELECT
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at
+	FROM job_runs WHERE job_id = ? ORDER BY created_at DESC
+	`, jobID)
 }
 
 func (r *jobRunRepo) ListByStatus(ctx context.Context, status jobrundomain.Status) ([]jobrundomain.JobRun, error) {
 	return r.listQuery(ctx, `
-SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
-FROM job_runs WHERE status = ? ORDER BY created_at DESC
-`, string(status))
+	SELECT
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at
+	FROM job_runs WHERE status = ? ORDER BY created_at DESC
+	`, string(status))
 }
 
 func (r *jobRunRepo) FindByDedupKey(ctx context.Context, key string) (jobrundomain.JobRun, bool, error) {
 	row := r.db.QueryRowContext(ctx, `
-SELECT id, job_id, scheduled_at, started_at, finished_at, status, attempt, trigger_type, message, created_at, updated_at
-FROM job_runs WHERE dedup_key = ? LIMIT 1
-`, key)
+	SELECT
+		id,
+		job_id,
+		scheduled_at,
+		started_at,
+		finished_at,
+		status,
+		attempt,
+		trigger_type,
+		message,
+		created_at,
+		updated_at
+	FROM job_runs WHERE dedup_key = ? LIMIT 1
+	`, key)
 	item, err := r.scanRun(row.Scan)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -104,18 +170,27 @@ func (r *jobRunRepo) listQuery(ctx context.Context, query string, args ...any) (
 
 func (r *jobRunRepo) scanRun(scan scanFunc) (*jobrundomain.JobRun, error) {
 	row := &jobrundomain.JobRun{}
+	var scheduledAt, startedAt, finishedAt, createdAt, updatedAt int64
 	err := scan(
 		&row.ID,
 		&row.JobID,
-		&row.ScheduledAt,
-		&row.StartedAt,
-		&row.FinishedAt,
+		&scheduledAt,
+		&startedAt,
+		&finishedAt,
 		&row.Status,
 		&row.Attempt,
 		&row.TriggerType,
 		&row.Message,
-		&row.CreatedAt,
-		&row.UpdatedAt,
+		&createdAt,
+		&updatedAt,
 	)
-	return row, err
+	if err != nil {
+		return nil, err
+	}
+	row.ScheduledAt = parseTime(scheduledAt)
+	row.StartedAt = parseTime(startedAt)
+	row.FinishedAt = parseTime(finishedAt)
+	row.CreatedAt = parseTime(createdAt)
+	row.UpdatedAt = parseTime(updatedAt)
+	return row, nil
 }

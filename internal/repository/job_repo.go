@@ -12,13 +12,35 @@ import (
 type jobRepo struct{ db *sql.DB }
 
 const selectJobColumns = `
-	id, name, description, enabled,
-	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
-	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
-	binary_command, binary_args_json, binary_timeout_seconds,
-	shell_script, shell_shell, shell_timeout_seconds,
-	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
-	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at`
+	id,
+	name,
+	description,
+	enabled,
+	schedule_cron,
+	schedule_interval_seconds,
+	schedule_time_zone,
+	schedule_starting_deadline_seconds,
+	executor_kind,
+	sdk_protocol,
+	sdk_url,
+	sdk_method,
+	sdk_timeout_seconds,
+	binary_command,
+	binary_args_json,
+	binary_timeout_seconds,
+	shell_script,
+	shell_shell,
+	shell_timeout_seconds,
+	retry_max_retries,
+	retry_initial_backoff_seconds,
+	retry_max_backoff_seconds,
+	retry_backoff_multiple,
+	concurrency_policy,
+	next_run_at,
+	last_run_at,
+	last_success_at,
+	created_at,
+	updated_at`
 
 func (r *jobRepo) Save(ctx context.Context, job jobdomain.Job) error {
 	binaryArgsJSON, err := json.Marshal(jobBinaryArgs(job))
@@ -27,13 +49,35 @@ func (r *jobRepo) Save(ctx context.Context, job jobdomain.Job) error {
 	}
 	_, err = r.db.ExecContext(ctx, `
 INSERT INTO jobs (
-	id, name, description, enabled,
-	schedule_cron, schedule_interval_seconds, schedule_time_zone, schedule_starting_deadline_seconds,
-	executor_kind, sdk_protocol, sdk_url, sdk_method, sdk_timeout_seconds,
-	binary_command, binary_args_json, binary_timeout_seconds,
-	shell_script, shell_shell, shell_timeout_seconds,
-	retry_max_retries, retry_initial_backoff_seconds, retry_max_backoff_seconds, retry_backoff_multiple,
-	concurrency_policy, next_run_at, last_run_at, last_success_at, created_at, updated_at
+	id,
+	name,
+	description,
+	enabled,
+	schedule_cron,
+	schedule_interval_seconds,
+	schedule_time_zone,
+	schedule_starting_deadline_seconds,
+	executor_kind,
+	sdk_protocol,
+	sdk_url,
+	sdk_method,
+	sdk_timeout_seconds,
+	binary_command,
+	binary_args_json,
+	binary_timeout_seconds,
+	shell_script,
+	shell_shell,
+	shell_timeout_seconds,
+	retry_max_retries,
+	retry_initial_backoff_seconds,
+	retry_max_backoff_seconds,
+	retry_backoff_multiple,
+	concurrency_policy,
+	next_run_at,
+	last_run_at,
+	last_success_at,
+	created_at,
+	updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE
 	name=VALUES(name),
@@ -144,11 +188,11 @@ func scanJob(scan scanFunc) (jobdomain.Job, error) {
 		retryMaxBackoffSeconds          int64
 		retryBackoffMultiple            float64
 		concurrencyPolicy               string
-		nextRunAt                       string
-		lastRunAt                       string
-		lastSuccessAt                   string
-		createdAt                       string
-		updatedAt                       string
+		nextRunAt                       int64
+		lastRunAt                       int64
+		lastSuccessAt                   int64
+		createdAt                       int64
+		updatedAt                       int64
 	)
 	if err := scan(
 		&id, &name, &description, &enabled,

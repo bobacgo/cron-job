@@ -83,9 +83,10 @@ func (l *Loop) tick(ctx context.Context) {
 	if !ok {
 		run.Status = jobrundomain.StatusFailed
 		run.Message = "unsupported executor type"
-		run.FinishedAt = time.Now().UTC()
-		run.UpdatedAt = time.Now().UTC()
-		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: run.UpdatedAt})
+		now := time.Now().UTC()
+		run.FinishedAt = now.Unix()
+		run.UpdatedAt = now.Unix()
+		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: now})
 		_ = l.runs.Save(ctx, run)
 		return
 	}
@@ -97,7 +98,7 @@ func (l *Loop) tick(ctx context.Context) {
 	}
 
 	run.Status = jobrundomain.StatusRunning
-	run.StartedAt = time.Now().UTC()
+	run.StartedAt = time.Now().UTC().Unix()
 	run.UpdatedAt = run.StartedAt
 	if err := l.runs.Save(ctx, run); err != nil {
 		log.Printf("dispatcher update running %s: %v", run.ID, err)
@@ -115,18 +116,18 @@ func (l *Loop) tick(ctx context.Context) {
 	if runCtx.Err() == context.Canceled {
 		run.Status = jobrundomain.StatusCanceled
 		run.Message = "canceled while running"
-		run.FinishedAt = time.Now().UTC()
+		run.FinishedAt = time.Now().UTC().Unix()
 		run.UpdatedAt = run.FinishedAt
-		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: run.UpdatedAt})
+		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: time.Unix(run.UpdatedAt, 0).UTC()})
 		_ = l.runs.Save(ctx, run)
 		return
 	}
 	if err != nil {
 		run.Status = jobrundomain.StatusFailed
 		run.Message = err.Error()
-		run.FinishedAt = time.Now().UTC()
+		run.FinishedAt = time.Now().UTC().Unix()
 		run.UpdatedAt = run.FinishedAt
-		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: run.UpdatedAt})
+		_ = l.logs.Append(ctx, runlog.LogRecord{RunID: run.ID, Stream: "stderr", Content: run.Message, OccurredAt: time.Unix(run.UpdatedAt, 0).UTC()})
 		_ = l.runs.Save(ctx, run)
 		l.scheduleRetry(ctx, job, run)
 		return
@@ -134,9 +135,9 @@ func (l *Loop) tick(ctx context.Context) {
 
 	run.Status = result.Status
 	run.Message = result.Message
-	run.StartedAt = result.StartedAt
-	run.FinishedAt = result.FinishedAt
-	run.UpdatedAt = result.FinishedAt
+	run.StartedAt = result.StartedAt.UTC().Unix()
+	run.FinishedAt = result.FinishedAt.UTC().Unix()
+	run.UpdatedAt = result.FinishedAt.UTC().Unix()
 	if result.Output != "" {
 		stream := "stdout"
 		if result.Status != jobrundomain.StatusSucceeded {
@@ -171,19 +172,19 @@ func (l *Loop) scheduleRetry(ctx context.Context, job jobdomain.Job, run jobrund
 	retryRun := jobrundomain.JobRun{
 		ID:          newID(),
 		JobID:       run.JobID,
-		ScheduledAt: time.Now().UTC().Add(delay),
+		ScheduledAt: time.Now().UTC().Add(delay).Unix(),
 		Status:      jobrundomain.StatusReady,
 		Attempt:     currentAttempt + 1,
 		TriggerType: "retry",
 		Message:     "scheduled automatic retry",
-		CreatedAt:   time.Now().UTC(),
-		UpdatedAt:   time.Now().UTC(),
+		CreatedAt:   time.Now().UTC().Unix(),
+		UpdatedAt:   time.Now().UTC().Unix(),
 	}
 	if err := l.runs.Save(ctx, retryRun); err != nil {
 		log.Printf("dispatcher save retry run %s: %v", retryRun.ID, err)
 		return
 	}
-	_ = l.logs.Append(ctx, runlog.LogRecord{RunID: retryRun.ID, Stream: "stdout", Content: "automatic retry scheduled", OccurredAt: retryRun.CreatedAt})
+	_ = l.logs.Append(ctx, runlog.LogRecord{RunID: retryRun.ID, Stream: "stdout", Content: "automatic retry scheduled", OccurredAt: time.Unix(retryRun.CreatedAt, 0).UTC()})
 	go func(runID string, wait time.Duration) {
 		timer := time.NewTimer(wait)
 		defer timer.Stop()

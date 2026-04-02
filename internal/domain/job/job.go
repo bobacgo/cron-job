@@ -27,11 +27,11 @@ type Job struct {
 	Executor          ExecutorSpec
 	RetryPolicy       RetryPolicy
 	ConcurrencyPolicy ConcurrencyPolicy
-	NextRunAt         time.Time
-	LastRunAt         time.Time
-	LastSuccessAt     time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	NextRunAt         int64
+	LastRunAt         int64
+	LastSuccessAt     int64
+	CreatedAt         int64
+	UpdatedAt         int64
 }
 
 type Schedule struct {

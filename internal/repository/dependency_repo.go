@@ -17,7 +17,12 @@ func (r *dependencyRepo) Replace(ctx context.Context, jobID string, edges []depe
 			return fmt.Errorf("delete dependencies: %w", err)
 		}
 		for _, edge := range edges {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO dependencies (job_id, depends_on_job_id) VALUES (?, ?)`, edge.JobID, edge.DependsOnJobID); err != nil {
+			if _, err := tx.ExecContext(ctx, `
+			INSERT INTO dependencies (
+				job_id,
+				depends_on_job_id
+			) VALUES (?, ?)
+			`, edge.JobID, edge.DependsOnJobID); err != nil {
 				return fmt.Errorf("insert dependency (job_id: %s, depends_on_job_id: %s): %w", edge.JobID, edge.DependsOnJobID, err)
 			}
 		}
@@ -29,7 +34,14 @@ func (r *dependencyRepo) Replace(ctx context.Context, jobID string, edges []depe
 
 // ListByJob 会返回 jobID 相关的所有依赖关系，即 edges 中的 JobID 都是 jobID
 func (r *dependencyRepo) ListByJob(ctx context.Context, jobID string) ([]dependencydomain.Edge, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies WHERE job_id = ? ORDER BY depends_on_job_id ASC`, jobID)
+	rows, err := r.db.QueryContext(ctx, `
+	SELECT
+		job_id,
+		depends_on_job_id
+	FROM dependencies
+	WHERE job_id = ?
+	ORDER BY depends_on_job_id ASC
+	`, jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +50,13 @@ func (r *dependencyRepo) ListByJob(ctx context.Context, jobID string) ([]depende
 }
 
 func (r *dependencyRepo) ListAll(ctx context.Context) ([]dependencydomain.Edge, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT job_id, depends_on_job_id FROM dependencies ORDER BY job_id ASC, depends_on_job_id ASC`)
+	rows, err := r.db.QueryContext(ctx, `
+	SELECT
+		job_id,
+		depends_on_job_id
+	FROM dependencies
+	ORDER BY job_id ASC, depends_on_job_id ASC
+	`)
 	if err != nil {
 		return nil, err
 	}

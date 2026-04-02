@@ -2,29 +2,18 @@ package repository
 
 import (
 	"errors"
-	"time"
 )
 
 var ErrNotFound = errors.New("not found")
 
 type scanFunc func(dest ...any) error
 
-func formatTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format(time.RFC3339Nano)
+func formatTime(ts int64) int64 {
+	return ts
 }
 
-func parseTime(raw string) time.Time {
-	if raw == "" {
-		return time.Time{}
-	}
-	parsed, err := time.Parse(time.RFC3339Nano, raw)
-	if err != nil {
-		return time.Time{}
-	}
-	return parsed.UTC()
+func parseTime(raw int64) int64 {
+	return raw
 }
 
 func boolToInt(v bool) int {

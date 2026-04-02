@@ -211,8 +211,8 @@ func (h *PageHandler) DependencyGraph(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		nextRunAt := "-"
-		if !item.NextRunAt.IsZero() {
-			nextRunAt = item.NextRunAt.UTC().Format("2006-01-02 15:04:05Z07:00")
+		if item.NextRunAt > 0 {
+			nextRunAt = time.Unix(item.NextRunAt, 0).UTC().Format("2006-01-02 15:04:05Z07:00")
 		}
 		nodes = append(nodes, map[string]any{
 			"id":           item.ID,

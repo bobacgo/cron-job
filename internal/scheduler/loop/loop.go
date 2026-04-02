@@ -54,14 +54,14 @@ func (l *Loop) tick(ctx context.Context) {
 
 	now := time.Now().UTC()
 	for _, item := range jobs {
-		if item.NextRunAt.IsZero() {
+		if item.NextRunAt <= 0 {
 			nextRunAt, err := l.planner.Next(item, now)
 			if err != nil {
 				log.Printf("schedule loop bootstrap job %s: %v", item.ID, err)
 				continue
 			}
-			item.NextRunAt = nextRunAt
-			item.UpdatedAt = now
+			item.NextRunAt = nextRunAt.Unix()
+			item.UpdatedAt = now.Unix()
 			if err := l.jobs.Save(ctx, item); err != nil {
 				log.Printf("schedule loop save bootstrap job %s: %v", item.ID, err)
 			}
@@ -90,12 +90,12 @@ func (l *Loop) tick(ctx context.Context) {
 		run := jobrundomain.JobRun{
 			ID:          newID(),
 			JobID:       item.ID,
-			ScheduledAt: dueAt,
+			ScheduledAt: dueAt.Unix(),
 			Status:      status,
 			Attempt:     1,
 			TriggerType: "schedule",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			CreatedAt:   now.Unix(),
+			UpdatedAt:   now.Unix(),
 		}
 		if _, exists, err := l.runs.FindByDedupKey(ctx, run.DedupKey()); err != nil {
 			log.Printf("schedule loop dedup lookup: %v", err)
@@ -114,13 +114,14 @@ func (l *Loop) tick(ctx context.Context) {
 			}
 		}
 
-		item.LastRunAt = dueAt
-		item.NextRunAt, err = l.planner.Next(item, dueAt)
+		item.LastRunAt = dueAt.Unix()
+		nextRunAt, err := l.planner.Next(item, dueAt)
 		if err != nil {
 			log.Printf("schedule loop next run job %s: %v", item.ID, err)
 			continue
 		}
-		item.UpdatedAt = now
+		item.NextRunAt = nextRunAt.Unix()
+		item.UpdatedAt = now.Unix()
 		if err := l.jobs.Save(ctx, item); err != nil {
 			log.Printf("schedule loop update job %s: %v", item.ID, err)
 		}

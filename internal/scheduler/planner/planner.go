@@ -22,11 +22,12 @@ func (p *Planner) Due(job jobdomain.Job, now time.Time) (time.Time, bool, error)
 	if !job.Enabled {
 		return time.Time{}, false, nil
 	}
-	if job.NextRunAt.IsZero() {
+	if job.NextRunAt <= 0 {
 		return time.Time{}, false, nil
 	}
-	if !job.NextRunAt.After(now) {
-		return job.NextRunAt, true, nil
+	nextRunAt := time.Unix(job.NextRunAt, 0).UTC()
+	if !nextRunAt.After(now) {
+		return nextRunAt, true, nil
 	}
 	return time.Time{}, false, nil
 }

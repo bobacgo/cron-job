@@ -1,6 +1,6 @@
 package jobrun
 
-import "time"
+import "strconv"
 
 type Status string
 
@@ -19,17 +19,17 @@ const (
 type JobRun struct {
 	ID          string
 	JobID       string
-	ScheduledAt time.Time
-	StartedAt   time.Time
-	FinishedAt  time.Time
+	ScheduledAt int64
+	StartedAt   int64
+	FinishedAt  int64
 	Status      Status
 	Attempt     int
 	TriggerType string
 	Message     string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedAt   int64
+	UpdatedAt   int64
 }
 
 func (r JobRun) DedupKey() string {
-	return r.JobID + "/" + r.ScheduledAt.UTC().Format(time.RFC3339Nano)
+	return r.JobID + "/" + strconv.FormatInt(r.ScheduledAt, 10)
 }

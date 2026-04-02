@@ -24,22 +24,22 @@ func TestDependencyLoopReleasesBlockedRun(t *testing.T) {
 	if err := runs.Save(ctx, jobrundomain.JobRun{
 		ID:          "run-upstream",
 		JobID:       "upstream",
-		ScheduledAt: now,
+		ScheduledAt: now.Unix(),
 		Status:      jobrundomain.StatusSucceeded,
 		Attempt:     1,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   now.Unix(),
+		UpdatedAt:   now.Unix(),
 	}); err != nil {
 		t.Fatalf("runs.Save(upstream) error = %v", err)
 	}
 	if err := runs.Save(ctx, jobrundomain.JobRun{
 		ID:          "run-downstream",
 		JobID:       "downstream",
-		ScheduledAt: now,
+		ScheduledAt: now.Unix(),
 		Status:      jobrundomain.StatusBlocked,
 		Attempt:     1,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   now.Unix(),
+		UpdatedAt:   now.Unix(),
 	}); err != nil {
 		t.Fatalf("runs.Save(downstream) error = %v", err)
 	}
@@ -73,8 +73,8 @@ func TestDependencyLoopKeepsBlockedWhenUpstreamNotSucceeded(t *testing.T) {
 		t.Fatalf("deps.Replace() error = %v", err)
 	}
 	now := time.Now().UTC()
-	_ = runs.Save(ctx, jobrundomain.JobRun{ID: "run-upstream", JobID: "upstream", ScheduledAt: now, Status: jobrundomain.StatusFailed, Attempt: 1, CreatedAt: now, UpdatedAt: now})
-	_ = runs.Save(ctx, jobrundomain.JobRun{ID: "run-downstream", JobID: "downstream", ScheduledAt: now, Status: jobrundomain.StatusBlocked, Attempt: 1, CreatedAt: now, UpdatedAt: now})
+	_ = runs.Save(ctx, jobrundomain.JobRun{ID: "run-upstream", JobID: "upstream", ScheduledAt: now.Unix(), Status: jobrundomain.StatusFailed, Attempt: 1, CreatedAt: now.Unix(), UpdatedAt: now.Unix()})
+	_ = runs.Save(ctx, jobrundomain.JobRun{ID: "run-downstream", JobID: "downstream", ScheduledAt: now.Unix(), Status: jobrundomain.StatusBlocked, Attempt: 1, CreatedAt: now.Unix(), UpdatedAt: now.Unix()})
 
 	l := NewDependency(deps, runs, q)
 	l.tick(ctx)

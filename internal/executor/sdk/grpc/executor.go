@@ -36,7 +36,7 @@ func (e *Executor) Execute(ctx context.Context, req executor.Request) (executor.
 		JobID:             req.Job.ID,
 		JobName:           req.Job.Name,
 		RunID:             req.Run.ID,
-		ScheduledAt:       req.Run.ScheduledAt,
+		ScheduledAt:       time.Unix(req.Run.ScheduledAt, 0).UTC(),
 		Attempt:           req.Run.Attempt,
 		TriggerType:       req.Run.TriggerType,
 	}

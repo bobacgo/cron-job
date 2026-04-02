@@ -49,7 +49,7 @@ func (l *DependencyLoop) tick(ctx context.Context) {
 			continue
 		}
 		run.Status = jobrundomain.StatusReady
-		run.UpdatedAt = time.Now().UTC()
+		run.UpdatedAt = time.Now().UTC().Unix()
 		if err := l.runs.Save(ctx, run); err != nil {
 			log.Printf("dependency loop update run %s: %v", run.ID, err)
 			continue

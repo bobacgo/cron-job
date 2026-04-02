@@ -47,7 +47,7 @@ func (r *JobRepo) List(_ context.Context) ([]jobdomain.Job, error) {
 		items = append(items, item)
 	}
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].CreatedAt.Before(items[j].CreatedAt)
+		return items[i].CreatedAt < items[j].CreatedAt
 	})
 	return items, nil
 }
@@ -105,7 +105,7 @@ func (r *JobRunRepo) List(_ context.Context) ([]jobrundomain.JobRun, error) {
 		items = append(items, item)
 	}
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].CreatedAt.After(items[j].CreatedAt)
+		return items[i].CreatedAt > items[j].CreatedAt
 	})
 	return items, nil
 }
@@ -120,7 +120,7 @@ func (r *JobRunRepo) ListByJob(_ context.Context, jobID string) ([]jobrundomain.
 		}
 	}
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].CreatedAt.After(items[j].CreatedAt)
+		return items[i].CreatedAt > items[j].CreatedAt
 	})
 	return items, nil
 }
@@ -135,7 +135,7 @@ func (r *JobRunRepo) ListByStatus(_ context.Context, status jobrundomain.Status)
 		}
 	}
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].CreatedAt.After(items[j].CreatedAt)
+		return items[i].CreatedAt > items[j].CreatedAt
 	})
 	return items, nil
 }

@@ -47,13 +47,13 @@ func (s *Service) Create(ctx context.Context, job jobdomain.Job, dependencyIDs [
 
 	now := time.Now().UTC()
 	job.ID = newID()
-	job.CreatedAt = now
-	job.UpdatedAt = now
+	job.CreatedAt = now.Unix()
+	job.UpdatedAt = now.Unix()
 	nextRunAt, err := s.planner.Next(job, now)
 	if err != nil {
 		return jobdomain.Job{}, err
 	}
-	job.NextRunAt = nextRunAt
+	job.NextRunAt = nextRunAt.Unix()
 	if job.ConcurrencyPolicy == "" {
 		job.ConcurrencyPolicy = jobdomain.ConcurrencyForbid
 	}
@@ -130,12 +130,12 @@ func (s *Service) Trigger(ctx context.Context, jobID string) (jobrundomain.JobRu
 	run := jobrundomain.JobRun{
 		ID:          newID(),
 		JobID:       job.ID,
-		ScheduledAt: now,
+		ScheduledAt: now.Unix(),
 		Status:      status,
 		Attempt:     1,
 		TriggerType: "manual",
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   now.Unix(),
+		UpdatedAt:   now.Unix(),
 	}
 	if err := s.repo.JobRun.Save(ctx, run); err != nil {
 		return jobrundomain.JobRun{}, err
@@ -154,7 +154,7 @@ func (s *Service) Pause(ctx context.Context, jobID string) (jobdomain.Job, error
 		return jobdomain.Job{}, err
 	}
 	job.Enabled = false
-	job.UpdatedAt = time.Now().UTC()
+	job.UpdatedAt = time.Now().UTC().Unix()
 	if err := s.repo.Job.Save(ctx, job); err != nil {
 		return jobdomain.Job{}, err
 	}
@@ -171,8 +171,8 @@ func (s *Service) Resume(ctx context.Context, jobID string) (jobdomain.Job, erro
 	if err != nil {
 		return jobdomain.Job{}, err
 	}
-	job.NextRunAt = nextRunAt
-	job.UpdatedAt = time.Now().UTC()
+	job.NextRunAt = nextRunAt.Unix()
+	job.UpdatedAt = time.Now().UTC().Unix()
 	if err := s.repo.Job.Save(ctx, job); err != nil {
 		return jobdomain.Job{}, err
 	}
@@ -209,10 +209,10 @@ func (s *Service) CancelRun(ctx context.Context, runID string) (jobrundomain.Job
 	run.Status = jobrundomain.StatusCanceled
 	run.Message = "canceled by user"
 	now := time.Now().UTC()
-	if run.FinishedAt.IsZero() {
-		run.FinishedAt = now
+	if run.FinishedAt <= 0 {
+		run.FinishedAt = now.Unix()
 	}
-	run.UpdatedAt = now
+	run.UpdatedAt = now.Unix()
 	if err := s.repo.JobRun.Save(ctx, run); err != nil {
 		return jobrundomain.JobRun{}, err
 	}
@@ -243,13 +243,13 @@ func (s *Service) RetryRun(ctx context.Context, runID string) (jobrundomain.JobR
 	run := jobrundomain.JobRun{
 		ID:          newID(),
 		JobID:       previous.JobID,
-		ScheduledAt: now,
+		ScheduledAt: now.Unix(),
 		Status:      jobrundomain.StatusReady,
 		Attempt:     attempt,
 		TriggerType: trigger,
 		Message:     "retry requested by user",
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   now.Unix(),
+		UpdatedAt:   now.Unix(),
 	}
 
 	// Keep the retry flow deterministic: only allow up to MaxRetries+1 attempts when configured.

@@ -51,13 +51,13 @@ func TestDispatcherSchedulesRetryAfterFailure(t *testing.T) {
 			Binary: &jobdomain.BinaryTarget{Command: "/bin/echo", Args: []string{"ok"}},
 		},
 		RetryPolicy: jobdomain.RetryPolicy{MaxRetries: 1, InitialBackoff: 5 * time.Millisecond, BackoffMultiple: 1},
-		CreatedAt:   time.Now().UTC(),
-		UpdatedAt:   time.Now().UTC(),
+		CreatedAt:   time.Now().UTC().Unix(),
+		UpdatedAt:   time.Now().UTC().Unix(),
 	}
 	if err := jobs.Save(ctx, job); err != nil {
 		t.Fatalf("save job: %v", err)
 	}
-	run := jobrundomain.JobRun{ID: "run-1", JobID: job.ID, ScheduledAt: time.Now().UTC(), Status: jobrundomain.StatusReady, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	run := jobrundomain.JobRun{ID: "run-1", JobID: job.ID, ScheduledAt: time.Now().UTC().Unix(), Status: jobrundomain.StatusReady, Attempt: 1, TriggerType: "manual", CreatedAt: time.Now().UTC().Unix(), UpdatedAt: time.Now().UTC().Unix()}
 	if err := runs.Save(ctx, run); err != nil {
 		t.Fatalf("save run: %v", err)
 	}
@@ -115,9 +115,9 @@ func TestDispatcherCooperativeCancel(t *testing.T) {
 	registry := executor.NewRegistry()
 	registry.Register("binary", &sleepExecutor{wait: 80 * time.Millisecond})
 
-	job := jobdomain.Job{ID: "job-2", Name: "job-2", Enabled: true, Executor: jobdomain.ExecutorSpec{Kind: jobdomain.ExecutorKindBinary, Binary: &jobdomain.BinaryTarget{Command: "/bin/echo", Args: []string{"ok"}}}, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	job := jobdomain.Job{ID: "job-2", Name: "job-2", Enabled: true, Executor: jobdomain.ExecutorSpec{Kind: jobdomain.ExecutorKindBinary, Binary: &jobdomain.BinaryTarget{Command: "/bin/echo", Args: []string{"ok"}}}, CreatedAt: time.Now().UTC().Unix(), UpdatedAt: time.Now().UTC().Unix()}
 	_ = jobs.Save(ctx, job)
-	run := jobrundomain.JobRun{ID: "run-2", JobID: job.ID, Status: jobrundomain.StatusReady, Attempt: 1, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	run := jobrundomain.JobRun{ID: "run-2", JobID: job.ID, Status: jobrundomain.StatusReady, Attempt: 1, CreatedAt: time.Now().UTC().Unix(), UpdatedAt: time.Now().UTC().Unix()}
 	_ = runs.Save(ctx, run)
 	_ = q.Enqueue(ctx, run.ID)
 

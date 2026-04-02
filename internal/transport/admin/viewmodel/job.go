@@ -69,8 +69,8 @@ func JobItems(items []jobdomain.Job) []JobItem {
 			schedule = item.Schedule.Interval.String()
 		}
 		nextRun := "-"
-		if !item.NextRunAt.IsZero() {
-			nextRun = item.NextRunAt.Format(time.RFC3339)
+		if item.NextRunAt > 0 {
+			nextRun = time.Unix(item.NextRunAt, 0).UTC().Format(time.RFC3339)
 		}
 		result = append(result, JobItem{
 			ID:          item.ID,
@@ -95,12 +95,12 @@ func DependencyOptions(items []jobdomain.Job) []DependencyOption {
 
 func NewJobDetail(item jobdomain.Job, deps []jobdomain.Job, runs []jobrundomain.JobRun) JobDetail {
 	lastSuccess := "-"
-	if !item.LastSuccessAt.IsZero() {
-		lastSuccess = item.LastSuccessAt.Format(time.RFC3339)
+	if item.LastSuccessAt > 0 {
+		lastSuccess = time.Unix(item.LastSuccessAt, 0).UTC().Format(time.RFC3339)
 	}
 	nextRun := "-"
-	if !item.NextRunAt.IsZero() {
-		nextRun = item.NextRunAt.Format(time.RFC3339)
+	if item.NextRunAt > 0 {
+		nextRun = time.Unix(item.NextRunAt, 0).UTC().Format(time.RFC3339)
 	}
 	schedule := item.Schedule.Cron
 	if schedule == "" {
@@ -133,9 +133,9 @@ func NewJobDetail(item jobdomain.Job, deps []jobdomain.Job, runs []jobrundomain.
 	}
 }
 
-func formatTime(value time.Time) string {
-	if value.IsZero() {
+func formatTime(value int64) string {
+	if value <= 0 {
 		return "-"
 	}
-	return value.Format(time.RFC3339)
+	return time.Unix(value, 0).UTC().Format(time.RFC3339)
 }

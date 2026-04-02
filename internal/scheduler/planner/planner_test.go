@@ -41,7 +41,7 @@ func TestNextCronWithTimezone(t *testing.T) {
 func TestDue(t *testing.T) {
 	p := New()
 	now := time.Date(2026, 3, 18, 10, 0, 0, 0, time.UTC)
-	job := jobdomain.Job{Enabled: true, NextRunAt: now.Add(-time.Second)}
+	job := jobdomain.Job{Enabled: true, NextRunAt: now.Add(-time.Second).Unix()}
 
 	dueAt, due, err := p.Due(job, now)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestDue(t *testing.T) {
 	if !due {
 		t.Fatalf("Due() due = false, want true")
 	}
-	if !dueAt.Equal(job.NextRunAt) {
-		t.Fatalf("Due() dueAt = %s, want %s", dueAt, job.NextRunAt)
+	if !dueAt.Equal(time.Unix(job.NextRunAt, 0).UTC()) {
+		t.Fatalf("Due() dueAt = %s, want %s", dueAt, time.Unix(job.NextRunAt, 0).UTC())
 	}
 }
