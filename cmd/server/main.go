@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bobacgo/cron-job/internal/admin"
 	jobapp "github.com/bobacgo/cron-job/internal/app/job"
 	"github.com/bobacgo/cron-job/internal/config"
 	"github.com/bobacgo/cron-job/internal/dispatcher"
@@ -19,7 +20,6 @@ import (
 	"github.com/bobacgo/cron-job/internal/repository"
 	"github.com/bobacgo/cron-job/internal/scheduler"
 	schedulerloop "github.com/bobacgo/cron-job/internal/scheduler/loop"
-	adminhandler "github.com/bobacgo/cron-job/internal/transport/admin/handler"
 	httpapihandler "github.com/bobacgo/cron-job/internal/transport/httpapi/handler"
 	"github.com/bobacgo/cron-job/internal/transport/httpapi/router"
 	"github.com/bobacgo/cron-job/kit/core"
@@ -32,7 +32,8 @@ import (
 
 type Beans struct {
 	APIHandler     *httpapihandler.JobHandler
-	AdminPages     *adminhandler.PageHandler
+	AuthHandler    *httpapihandler.AuthHandler
+	MgrHandler     *httpapihandler.MgrHandler
 	ScheduleLoop   *schedulerloop.Loop
 	DependencyLoop *schedulerloop.DependencyLoop
 	RunLoop        *dispatcherloop.Loop
@@ -40,7 +41,7 @@ type Beans struct {
 
 type App struct {
 	Cfg      *config.Config
-	DB       types.ConfigMap[sqlx.DB]
+	DB       types.KV[sqlx.DB]
 	HttpAddr string
 	Beans    *Beans
 }
@@ -76,7 +77,7 @@ func main() {
 
 	// 添加 http 服务
 	server.Add(func(a *App) (core.Service, error) {
-		httpServer := core.NewHTTPServer(a.HttpAddr, router.New(a.Beans.APIHandler, a.Beans.AdminPages), 5*time.Second)
+		httpServer := core.NewHTTPServer(a.HttpAddr, router.New(a.Beans.APIHandler, a.Beans.MgrHandler), 5*time.Second)
 		return httpServer, nil
 	})
 
@@ -103,6 +104,10 @@ func main() {
 // 对象容器
 func initBeans(app *App) error {
 	db := app.DB.Default()
+	adminSvc := admin.New(db)
+	if err := adminSvc.Bootstrap(context.Background()); err != nil {
+		return err
+	}
 	repo := repository.NewRepo(app.Cfg, db)
 
 	executorRegistry := executor.NewRegistry()
@@ -116,9 +121,11 @@ func initBeans(app *App) error {
 
 	jobService := jobapp.NewService(repo, dispcher.ReadyQueue, schedulerSvc.Planner)
 	jobService.SetRunCanceler(dispcher.RunCancelManager)
+	authHandler := httpapihandler.NewAuthHandler()
 	app.Beans = &Beans{
 		APIHandler:     httpapihandler.NewJobHandler(jobService),
-		AdminPages:     adminhandler.NewPageHandler(jobService, repo.JobRun, repo.Log),
+		AuthHandler:    authHandler,
+		MgrHandler:     httpapihandler.NewMgrHandler(adminSvc, authHandler),
 		ScheduleLoop:   schedulerloop.New(repo, dispcher.ReadyQueue, schedulerSvc.Planner),
 		DependencyLoop: schedulerloop.NewDependency(repo.Dependencies, repo.JobRun, dispcher.ReadyQueue),
 		RunLoop:        dispatcherloop.New(repo, dispcher.ReadyQueue, dispcher.LeaseManager, dispcher.RunCancelManager, executorRegistry),

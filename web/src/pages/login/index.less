@@ -1,0 +1,345 @@
+// macOS Sonoma 锁屏风格
+.login-wrapper {
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  color: #fff;
+}
+
+// 动态壁纸
+.wallpaper-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.wallpaper-bg {
+  width: 100%;
+  height: 100%;
+  // macOS Sonoma 风格渐变
+  background: linear-gradient(125deg, #2c3e50 0%, #3498db 50%, #8e44ad 100%);
+  background-size: 200% 200%;
+  animation: gradient-move 20s ease infinite;
+}
+
+.wallpaper-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.1); // 轻微遮罩
+  backdrop-filter: blur(0px); // 锁屏时通常没有模糊，或者很轻微
+}
+
+@keyframes gradient-move {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+// 主内容布局
+.login-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+// 顶部状态栏
+.top-status-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 12px 20px;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  
+  .right-info {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 14px;
+    
+    .icon {
+      opacity: 0.9;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+  }
+}
+
+// 锁屏大时钟
+.lock-screen-clock {
+  margin-top: 12vh; // 距离顶部约 12%
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  
+  .date {
+    font-size: 22px;
+    font-weight: 500;
+    opacity: 0.9;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  
+  .time {
+    font-size: 96px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -2px;
+    background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.1));
+  }
+}
+
+// 底部登录容器
+.bottom-login-container {
+  position: absolute;
+  bottom: 15vh; // 距离底部约 15%
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+  
+  // 进场动画
+  animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+// 头像
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+  
+  .avatar-box {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    margin-bottom: 12px;
+    border: 2px solid rgba(255,255,255,0.2);
+    
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+  
+  .account-name {
+    font-size: 18px;
+    font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+}
+
+// 登录表单容器 (无卡片背景)
+.login-form-container {
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+// 底部按钮
+.bottom-actions {
+  display: flex;
+  gap: 32px;
+  margin-top: auto;
+  
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+    
+    .icon {
+      font-size: 24px;
+      background: rgba(255,255,255,0.2);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+    
+    span:last-child {
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    &:hover {
+      opacity: 1;
+      transform: scale(1.05);
+      
+      .icon {
+        background: rgba(255,255,255,0.3);
+      }
+    }
+  }
+}
+
+// 覆盖 TDesign 输入框样式以匹配 macOS
+.item-container {
+  width: 240px !important; // 限制宽度，更像 macOS 密码框
+  margin: 0 auto;
+
+  :deep(.t-form__item) {
+    margin-bottom: 12px;
+  }
+
+  :deep(.t-input) {
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  :deep(.t-input__inner) {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important; // 胶囊形状
+    color: #fff !important;
+    text-align: center; // 文字居中
+    height: 38px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+    font-size: 13px;
+    
+    &::placeholder {
+      color: rgba(255,255,255,0.6);
+    }
+    
+    &:focus {
+      background: rgba(255, 255, 255, 0.35) !important;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+      border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+  }
+  
+  // 隐藏输入框的前后缀图标，保持极简
+  :deep(.t-input__prefix),
+  :deep(.t-input__suffix) {
+    display: none; // macOS 风格通常不显示图标
+  }
+
+  // 验证码区域样式优化
+  .verification-code {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    
+    :deep(.t-input) {
+      flex: 1;
+      width: auto;
+    }
+    
+    :deep(.t-button) {
+      width: auto !important;
+      height: 38px;
+      padding: 0 12px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.15) !important;
+      color: rgba(255, 255, 255, 0.9) !important;
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      border-radius: 20px !important;
+      backdrop-filter: blur(10px);
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+      }
+      
+      &.t-is-disabled {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: rgba(255, 255, 255, 0.4) !important;
+        border-color: transparent !important;
+      }
+    }
+  }
+
+  // 注册按钮样式优化
+  :deep(.t-button--theme-primary),
+  :deep(.t-button[type="submit"]) {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #fff !important;
+    border-radius: 20px !important;
+    height: 38px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3) !important;
+      transform: translateY(-1px);
+    }
+    
+    &:active {
+      transform: translateY(0);
+      background: rgba(255, 255, 255, 0.15) !important;
+    }
+  }
+
+  // 记住密码/忘记密码 样式调整
+  .check-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+    margin-bottom: 0;
+    
+    :deep(.t-checkbox__label) {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 12px;
+    }
+    
+    .tip {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 12px;
+      margin-left: 8px;
+      text-decoration: none;
+      
+      &:hover {
+        color: #fff;
+        text-decoration: underline;
+      }
+    }
+  }
+  
+  // 切换登录方式
+  .switch-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+    font-size: 12px;
+    
+    .tip {
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      transition: color 0.2s;
+      
+      &:hover {
+        color: #fff;
+      }
+    }
+  }
+}
+

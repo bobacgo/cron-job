@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,45 +20,58 @@ func NewRunLogHandler(service *jobapp.Service) *RunLogHandler {
 func (h *RunLogHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/job-runs/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) == 2 && parts[1] == "logs" && r.Method == http.MethodGet {
-		stream := strings.TrimSpace(r.URL.Query().Get("stream"))
-		content, err := h.service.ReadRunLogStream(r.Context(), parts[0], stream)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"run_id": parts[0], "stream": stream, "content": content})
+	if len(parts) != 2 {
+		writeError(w, http.StatusMethodNotAllowed, http.ErrNotSupported)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "cancel" && r.Method == http.MethodPost {
-		run, err := h.service.CancelRun(r.Context(), parts[0])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(run)
+
+	switch {
+	case parts[1] == "logs" && r.Method == http.MethodGet:
+		h.Logs(w, r, parts[0])
+		return
+	case parts[1] == "cancel" && r.Method == http.MethodPost:
+		h.Cancel(w, r, parts[0])
+		return
+	case parts[1] == "retry" && r.Method == http.MethodPost:
+		h.Retry(w, r, parts[0])
+		return
+	default:
+		writeError(w, http.StatusMethodNotAllowed, http.ErrNotSupported)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "retry" && r.Method == http.MethodPost {
-		run, err := h.service.RetryRun(r.Context(), parts[0])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(run)
+}
+
+func (h *RunLogHandler) Logs(w http.ResponseWriter, r *http.Request, runID string) {
+	stream := strings.TrimSpace(r.URL.Query().Get("stream"))
+	content, err := h.service.ReadRunLogStream(r.Context(), runID, stream)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-	return
+	writeJSONStatus(w, http.StatusOK, map[string]any{"run_id": runID, "stream": stream, "content": content})
+}
+
+func (h *RunLogHandler) Cancel(w http.ResponseWriter, r *http.Request, runID string) {
+	run, err := h.service.CancelRun(r.Context(), runID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSONStatus(w, http.StatusOK, run)
+}
+
+func (h *RunLogHandler) Retry(w http.ResponseWriter, r *http.Request, runID string) {
+	run, err := h.service.RetryRun(r.Context(), runID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSONStatus(w, http.StatusCreated, run)
 }
 
 func (h *RunLogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, http.ErrNotSupported)
 		return
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -70,9 +82,8 @@ func (h *RunLogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Limit:    limit,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"items": items, "count": len(items)})
+	writeJSONStatus(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
 }

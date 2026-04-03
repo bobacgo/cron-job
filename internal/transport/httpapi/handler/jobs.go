@@ -25,17 +25,16 @@ func (h *JobHandler) Service() *jobapp.Service {
 func (h *JobHandler) List(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.List(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(items)
+	writeJSONStatus(w, http.StatusOK, items)
 }
 
 func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createJobRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -60,54 +59,47 @@ func (h *JobHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.service.Create(r.Context(), job, req.DependencyIDs)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(created)
+	writeJSONStatus(w, http.StatusCreated, created)
 }
 
 func (h *JobHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 	detail, err := h.service.GetDetail(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeError(w, http.StatusNotFound, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(detail)
+	writeJSONStatus(w, http.StatusOK, detail)
 }
 
 func (h *JobHandler) Trigger(w http.ResponseWriter, r *http.Request, id string) {
 	run, err := h.service.Trigger(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(run)
+	writeJSONStatus(w, http.StatusCreated, run)
 }
 
 func (h *JobHandler) Pause(w http.ResponseWriter, r *http.Request, id string) {
 	job, err := h.service.Pause(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(job)
+	writeJSONStatus(w, http.StatusOK, job)
 }
 
 func (h *JobHandler) Resume(w http.ResponseWriter, r *http.Request, id string) {
 	job, err := h.service.Resume(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(job)
+	writeJSONStatus(w, http.StatusOK, job)
 }
 
 func (h *JobHandler) HandleByID(w http.ResponseWriter, r *http.Request) {

@@ -25,8 +25,8 @@ func (d DB) Validate() error {
 }
 
 // 多数据源管理
-func NewDBManager(cfgKV types.ConfigMap[Config]) (types.ConfigMap[DB], error) {
-	dbs := make(types.ConfigMap[DB], len(cfgKV))
+func NewDBManager(cfgKV types.KV[Config]) (types.KV[DB], error) {
+	dbs := make(types.KV[DB], len(cfgKV))
 	for k, cfg := range cfgKV {
 		var err error
 		if dbs[k], err = NewDB(cfg); err != nil {

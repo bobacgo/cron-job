@@ -11,9 +11,9 @@ import (
 // Config 是整个应用的配置结构体
 // 和 config.yaml 的结构一一对应
 type Config struct {
-	HTTPAddr string                       `yaml:"http_addr"`
-	LogDir   string                       `yaml:"log_dir"`
-	Database types.ConfigMap[sqlx.Config] `yaml:"sqlx"`
+	HTTPAddr string                `yaml:"http_addr"`
+	LogDir   string                `yaml:"log_dir"`
+	Database types.KV[sqlx.Config] `yaml:"database"`
 }
 
 func (c *Config) Validate() error {
